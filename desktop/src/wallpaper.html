@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  video, img { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+  .fill { object-fit: cover; }
+  .fit { object-fit: contain; }
+</style>
+</head>
+<body>
+<video id="v" loop playsinline></video>
+<img id="i" alt="">
+<script>
+  const v = document.getElementById('v');
+  const img = document.getElementById('i');
+  let currentUrl = null;
+
+  window.alexia.on('media', (m) => {
+    const cls = m.fill ? 'fill' : 'fit';
+    v.className = cls;
+    img.className = cls;
+    v.muted = m.mute;
+
+    if (m.url !== currentUrl) {
+      currentUrl = m.url;
+      if (!m.url) {
+        v.style.display = 'none'; img.style.display = 'none';
+        v.removeAttribute('src'); v.load(); img.removeAttribute('src');
+      } else if (m.isVideo) {
+        img.style.display = 'none'; img.removeAttribute('src');
+        v.src = m.url; v.style.display = 'block';
+      } else {
+        v.pause(); v.removeAttribute('src'); v.load(); v.style.display = 'none';
+        img.src = m.url; img.style.display = 'block';
+      }
+    }
+    // GIF sa pozastaviť nedá, tak ho pri pauze skryjeme
+    if (m.isVideo && m.url) {
+      if (m.paused) v.pause(); else v.play().catch(() => {});
+    } else if (m.url) {
+      img.style.visibility = m.paused ? 'hidden' : 'visible';
+    }
+  });
+</script>
+</body>
+</html>

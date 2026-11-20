@@ -1,4 +1,4 @@
-name: Build APK
+name: Build (Android, Windows, Linux)
 
 on:
   push:
@@ -9,36 +9,74 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
-
       - name: Build APK
         run: gradle assembleDebug --no-daemon --stacktrace
-
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk AlexiaLiveTapeta.apk
-
+        run: cp app/build/outputs/apk/debug/app-debug.apk AlexiaLiveTapeta-android.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: AlexiaLiveTapeta
-          path: AlexiaLiveTapeta.apk
+          name: android
+          path: AlexiaLiveTapeta-android.apk
 
-      # Release = APK sa dá stiahnuť priamo v mobile bez prihlásenia
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Alexia Live Tapeta 1.0.${{ github.run_number }}
-          files: AlexiaLiveTapeta.apk
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run dist:${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: [ android, desktop ]
+    if: always() && needs.android.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - run: ls -la out
+      # Release = súbory sa dajú stiahnuť priamo v mobile/PC bez prihlásenia
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.${{ github.run_number }}
+          name: Alexia Live Tapeta 2.0.${{ github.run_number }}
+          files: out/*
           make_latest: true
+          body: |
+            **Android:** AlexiaLiveTapeta-android.apk
+            **Windows:** AlexiaLiveTapeta-windows-setup.exe (inštalátor) alebo AlexiaLiveTapeta-windows-portable.exe (bez inštalácie)
+            **Linux:** .AppImage (všetky distribúcie) alebo .deb (Ubuntu/Debian/Mint)

@@ -1,0 +1,62 @@
+{
+  "name": "alexia-live-tapeta",
+  "productName": "Alexia Live Tapeta",
+  "version": "2.0.0",
+  "description": "GIF alebo video ako živá tapeta na ploche (Windows + Linux), sťahovanie cez yt-dlp",
+  "main": "src/main.js",
+  "author": "havetkin-cyber",
+  "license": "MIT",
+  "homepage": "https://github.com/havetkin-cyber/APK",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.alexia.livewallpaper.desktop",
+    "productName": "Alexia Live Tapeta",
+    "artifactName": "AlexiaLiveTapeta-${os}-${arch}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "AlexiaLiveTapeta-windows-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "AlexiaLiveTapeta-windows-setup.exe"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "maintainer": "havetkin-cyber <havetkin-cyber@users.noreply.github.com>"
+    }
+  }
+}

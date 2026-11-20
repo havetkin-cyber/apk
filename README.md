@@ -14,6 +14,15 @@ Android appka, ktorá nastaví **GIF alebo krátke video** ako živú tapetu na 
 - Šetrí batériu – keď tapetu nevidno, prehrávanie sa pozastaví
 
 ## Stiahnutie APK
-Každý push do `main` spustí GitHub Actions a APK sa objaví v **Releases** (`AlexiaLiveTapeta.apk`).
+Každý push do `main` spustí GitHub Actions a všetko sa objaví v **Releases** (`AlexiaLiveTapeta-android.apk`).
 
 Vyžaduje Android 9+.
+
+## PC (Windows) a Linux
+Priečinok `desktop/` – Electron appka s rovnakými funkciami:
+- video / GIF ako živá tapeta **za ikonami na ploche** (Windows 10/11), na Linuxe ako okno plochy (X11: KDE, XFCE, Cinnamon, MATE, GNOME na Xorg; na Waylande cez XWayland, nie všade)
+- viac monitorov, pauza z lišty, spustenie so systémom
+- sťahovanie cez **yt-dlp** – stiahne sa z GitHubu pri prvom spustení a **sám sa aktualizuje** (pri štarte a potom každých 6 h)
+- Moja galéria, Galéria 4K z webu, Moje odkazy
+
+V **Releases** nájdeš `AlexiaLiveTapeta-windows-setup.exe`, `AlexiaLiveTapeta-windows-portable.exe`, `.AppImage` a `.deb`.

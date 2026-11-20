@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data:; img-src 'self' file: data: https:; media-src file: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Alexia Live Tapeta</title>
+<style>
+  :root { --bg:#0E0B1A; --card:#1E1538; --accent:#8B5CF6; --dim:rgba(255,255,255,.65); }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, "Segoe UI", Ubuntu, sans-serif; background:var(--bg); color:#fff; display:flex; flex-direction:column; height:100vh; }
+  header { padding:16px 20px 8px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  h1 { font-size:22px; margin:0; flex:1; }
+  .row { display:flex; gap:8px; padding:0 20px; flex-wrap:wrap; align-items:center; }
+  input[type=text] { flex:1; min-width:240px; background:var(--card); border:1px solid #3a2d63; color:#fff; padding:10px 12px; border-radius:8px; font-size:14px; }
+  button { background:var(--card); color:#fff; border:1px solid #3a2d63; padding:9px 14px; border-radius:8px; cursor:pointer; font-size:14px; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  label { color:var(--dim); font-size:14px; display:flex; align-items:center; gap:6px; }
+  progress { width:100%; height:6px; accent-color:var(--accent); }
+  #progressRow { padding:6px 20px 0; display:none; }
+  nav { display:flex; gap:6px; padding:12px 20px 0; }
+  nav button.active { border-color:var(--accent); color:var(--accent); }
+  #chips { display:flex; gap:6px; padding:8px 20px 0; flex-wrap:wrap; }
+  #chips button { font-size:13px; padding:6px 10px; }
+  main { flex:1; overflow:auto; padding:12px 20px 20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px; }
+  .card { position:relative; background:#000; border-radius:10px; overflow:hidden; aspect-ratio: 16/10; cursor:pointer; border:2px solid transparent; }
+  .card.current { border-color:var(--accent); }
+  .card video, .card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card .label { position:absolute; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); font-size:12px; padding:4px 8px; }
+  .card .del { position:absolute; top:6px; right:6px; padding:2px 8px; font-size:12px; background:rgba(0,0,0,.6); display:none; }
+  .card:hover .del { display:block; }
+  .info { color:var(--dim); text-align:center; padding:20px; }
+  .links li { display:flex; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #241a42; }
+  .links li span { flex:1; word-break:break-all; }
+  ul.links { list-style:none; padding:0; margin:0; }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#2b1f52; padding:10px 16px; border-radius:8px; display:none; max-width:80%; }
+  footer { color:var(--dim); font-size:12px; padding:6px 20px 10px; display:flex; gap:12px; align-items:center; }
+  footer a { color:var(--dim); cursor:pointer; text-decoration:underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Alexia Live Tapeta</h1>
+  <label><input type="checkbox" id="mute"> Bez zvuku</label>
+  <label><input type="checkbox" id="fill"> Vyplniť obrazovku</label>
+  <label><input type="checkbox" id="autostart"> Spustiť so systémom</label>
+  <button id="pause">⏸ Pozastaviť</button>
+</header>
+
+<div class="row">
+  <input type="text" id="url" placeholder="Odkaz: TikTok, YouTube, Instagram, Reddit, X, priamy GIF/MP4…">
+  <button class="primary" id="download">Stiahnuť</button>
+  <button id="pick">Vybrať súbor…</button>
+</div>
+<div id="progressRow"><progress id="progress" max="100"></progress></div>
+
+<nav>
+  <button data-tab="mine" class="active">Moja galéria</button>
+  <button data-tab="web">Galéria 4K z webu</button>
+  <button data-tab="links">Moje odkazy</button>
+</nav>
+<div id="chips" style="display:none"></div>
+
+<main id="content"></main>
+
+<footer>
+  <span id="ytver">yt-dlp: …</span>
+  <a id="update">Skontrolovať aktualizáciu yt-dlp</a>
+  <a id="folder">Otvoriť priečinok</a>
+</footer>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = window.alexia;
+let state = null;
+let tab = 'mine';
+let webQuery = null, webNext = 0, webLoading = false, webItems = [];
+
+const UHD = 'filew:>3839', FHD = 'filew:>1919';
+const PRESETS = [
+  ['4K videá', 'filetype:video ' + UHD],
+  ['Príroda 4K', 'nature filetype:video ' + UHD],
+  ['Vesmír 4K', 'space filetype:video ' + UHD],
+  ['Oceán 4K', 'ocean filetype:video ' + UHD],
+  ['Mesto 4K', 'city filetype:video ' + UHD],
+  ['Full HD videá', 'filetype:video ' + FHD],
+  ['GIFy', 'animated filemime:image/gif filew:>700'],
+];
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.style.display = 'none'), 3500);
+}
+
+async function refresh() {
+  state = await api.getState();
+  $('mute').checked = state.config.mute;
+  $('fill').checked = state.config.fill;
+  $('autostart').checked = state.config.autostart;
+  $('pause').textContent = state.media.paused ? '▶ Spustiť' : '⏸ Pozastaviť';
+  render();
+}
+
+function el(tag, props = {}, ...children) {
+  const e = document.createElement(tag);
+  Object.assign(e, props);
+  children.forEach((c) => e.append(c));
+  return e;
+}
+
+function render() {
+  const c = $('content');
+  $('chips').style.display = tab === 'web' ? 'flex' : 'none';
+  c.innerHTML = '';
+  if (tab === 'mine') {
+    if (!state.library.length) {
+      c.append(el('div', { className: 'info', textContent: 'Zatiaľ nič. Vlož odkaz (napr. TikTok) a stlač Stiahnuť.' }));
+      return;
+    }
+    const g = el('div', { className: 'grid' });
+    for (const it of state.library) {
+      const media = it.isVideo
+        ? el('video', { src: it.url + '#t=1', muted: true, preload: 'metadata' })
+        : el('img', { src: it.url, loading: 'lazy' });
+      if (it.isVideo) {
+        media.addEventListener('mouseenter', () => media.play().catch(() => {}));
+        media.addEventListener('mouseleave', () => media.pause());
+      }
+      const del = el('button', { className: 'del', textContent: '✕' });
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        if (confirm('Vymazať z Mojej galérie?')) { await api.remove(it.path); refresh(); }
+      };
+      const card = el('div', { className: 'card' + (it.current ? ' current' : '') }, media,
+        el('div', { className: 'label', textContent: `${it.current ? '✓ ' : ''}${it.isVideo ? '▶ video' : 'GIF'} · ${it.sizeMb} MB` }), del);
+      card.onclick = async () => { await api.select(it.path); refresh(); };
+      g.append(card);
+    }
+    c.append(g);
+  } else if (tab === 'web') {
+    const g = el('div', { className: 'grid', id: 'webgrid' });
+    for (const it of webItems) {
+      const card = el('div', { className: 'card' },
+        el('img', { src: it.thumb || '', loading: 'lazy' }),
+        el('div', { className: 'label', textContent: it.label }));
+      card.onclick = () => startDownload(it.url);
+      g.append(card);
+    }
+    c.append(g);
+    if (!webItems.length && !webLoading) c.append(el('div', { className: 'info', textContent: 'Nič sa nenašlo' }));
+    if (webLoading) c.append(el('div', { className: 'info', textContent: 'Načítavam…' }));
+    c.append(el('div', { className: 'info', textContent: 'Voľne licencované videá z Wikimedia Commons' }));
+  } else {
+    const ul = el('ul', { className: 'links' });
+    for (const l of state.config.links) {
+      const get = el('button', { textContent: 'Stiahnuť' });
+      get.onclick = () => startDownload(l);
+      const rm = el('button', { textContent: '✕' });
+      rm.onclick = async () => { await api.removeLink(l); refresh(); };
+      ul.append(el('li', {}, el('span', { textContent: l }), get, rm));
+    }
+    c.append(ul);
+  }
+}
+
+async function loadWeb(reset) {
+  if (reset) { webItems = []; webNext = 0; }
+  if (webNext === null || webLoading) return;
+  webLoading = true; render();
+  try {
+    const r = await api.commons(webQuery, webNext);
+    webItems.push(...r.items);
+    webNext = r.next;
+    webLoading = false;
+    if (!webItems.length) {
+      if (webNext !== null && webNext < 300) return loadWeb(false);
+      if (webQuery.includes(UHD)) { webQuery = webQuery.replace(UHD, FHD); return loadWeb(true); }
+    }
+  } catch (e) {
+    webLoading = false;
+    toast('Galéria sa nenačítala: ' + e.message);
+  }
+  render();
+}
+
+function search(q) { webQuery = q; loadWeb(true); }
+
+async function startDownload(url) {
+  if (!url || !url.trim()) return;
+  $('download').disabled = true;
+  $('progressRow').style.display = 'block';
+  $('progress').removeAttribute('value');
+  toast('Sťahujem…');
+  const r = await api.download(url);
+  $('download').disabled = false;
+  $('progressRow').style.display = 'none';
+  if (r.ok) {
+    toast('Hotovo – nastavené ako tapeta a uložené do Mojej galérie ✓');
+    tab = 'mine'; setTabButtons();
+  } else {
+    toast('Sťahovanie zlyhalo: ' + r.error);
+  }
+  refresh();
+}
+
+function setTabButtons() {
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+}
+
+// ---- udalosti ----
+document.querySelectorAll('nav button').forEach((b) => b.onclick = () => {
+  tab = b.dataset.tab; setTabButtons();
+  if (tab === 'web' && webQuery === null) search(PRESETS[0][1]);
+  render();
+});
+for (const [label, q] of PRESETS) {
+  const b = el('button', { textContent: label });
+  b.onclick = () => search(q);
+  $('chips').append(b);
+}
+$('content').addEventListener('scroll', () => {
+  const c = $('content');
+  if (tab === 'web' && c.scrollTop + c.clientHeight > c.scrollHeight - 300) loadWeb(false);
+});
+$('download').onclick = () => startDownload($('url').value);
+$('url').addEventListener('keydown', (e) => e.key === 'Enter' && startDownload($('url').value));
+$('pick').onclick = async () => { if (await api.pickFile()) { tab = 'mine'; setTabButtons(); refresh(); } };
+$('mute').onchange = (e) => api.setOption('mute', e.target.checked);
+$('fill').onchange = (e) => api.setOption('fill', e.target.checked);
+$('autostart').onchange = (e) => api.setOption('autostart', e.target.checked);
+$('pause').onclick = () => api.setPaused(!state.media.paused).then(refresh);
+$('folder').onclick = () => api.openFolder();
+$('update').onclick = async () => {
+  toast('Kontrolujem novú verziu yt-dlp…');
+  try {
+    const r = await api.ytdlpUpdate();
+    $('ytver').textContent = 'yt-dlp: ' + (r.version || '?');
+    toast(r.updated ? 'yt-dlp aktualizovaný na ' + r.updated : 'yt-dlp je aktuálny');
+  } catch (e) { toast('Aktualizácia zlyhala: ' + e.message); }
+};
+
+api.on('progress', (p) => { $('progress').value = p; });
+api.on('state-changed', refresh);
+api.on('toast', (m) => { toast(m); api.ytdlpVersion().then((v) => v && ($('ytver').textContent = 'yt-dlp: ' + v)); });
+
+refresh();
+api.ytdlpVersion().then((v) => ($('ytver').textContent = 'yt-dlp: ' + (v || 'sťahuje sa…')));
+</script>
+</body>
+</html>
