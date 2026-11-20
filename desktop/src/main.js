@@ -37,6 +37,7 @@ const libraryDir = () => {
 const configPath = () => path.join(dataDir(), 'config.json');
 
 const DEFAULT_LINKS = [
+  'https://vm.tiktok.com/ZN8mkYNFT/',
   'https://vm.tiktok.com/ZN8mhhvnH/',
   'https://vm.tiktok.com/ZN8mhuQKC/',
   'https://vm.tiktok.com/ZN8mhrtjf/',
@@ -240,8 +241,11 @@ function applyAutostart() {
 
 const MEDIA_URL = /\.(gif|webp|mp4|webm|mkv|mov)(\?.*)?$/i;
 
+let stampCounter = 0;
+const uniqueBase = () => `${Date.now()}-${stampCounter++}`;
+
 async function downloadDirect(url, onProgress) {
-  const base = String(Date.now());
+  const base = uniqueBase();
   const tmp = path.join(libraryDir(), base + '.download');
   const { contentType } = await ytdlp.downloadTo(url, tmp, onProgress);
   if (contentType.startsWith('text/html')) {
@@ -254,26 +258,49 @@ async function downloadDirect(url, onProgress) {
   return final;
 }
 
-async function resolveTikTok(url) {
+const tikAbs = (u) => (u.startsWith('/') ? 'https://www.tikwm.com' + u : u);
+
+async function tikTokData(url) {
   const res = await net.fetch('https://www.tikwm.com/api/?hd=1&url=' + encodeURIComponent(url));
   const json = await res.json();
   if (json.code !== 0) throw new Error('TikTok: ' + (json.msg || 'nenájdené'));
-  const d = json.data || {};
-  const u = d.hdplay || d.play || d.wmplay || (d.images && d.images[0]);
-  if (!u) throw new Error('V TikTok príspevku nie je video');
-  return u.startsWith('/') ? 'https://www.tikwm.com' + u : u;
+  return json.data || {};
 }
 
+const tikImages = (d) => (Array.isArray(d.images) ? d.images.filter(Boolean).map(tikAbs) : []);
+
+async function resolveTikTok(url) {
+  const d = await tikTokData(url);
+  const u = tikImages(d)[0] || d.hdplay || d.play || d.wmplay;
+  if (!u) throw new Error('V TikTok príspevku nie je video');
+  return tikAbs(u);
+}
+
+/** Vráti zoznam stiahnutých súborov (TikTok fotkový príspevok = všetky fotky). */
 async function downloadAny(rawUrl, onProgress) {
   let url = rawUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  if (MEDIA_URL.test(new URL(url).pathname)) return downloadDirect(url, onProgress);
-  try {
-    return await ytdlp.download(url, libraryDir(), String(Date.now()), onProgress);
-  } catch (e) {
-    if (/tiktok\.com/i.test(url)) {
-      return downloadDirect(await resolveTikTok(url), onProgress);
+  if (MEDIA_URL.test(new URL(url).pathname)) return [await downloadDirect(url, onProgress)];
+
+  if (/tiktok\.com/i.test(url)) {
+    let images = [];
+    try { images = tikImages(await tikTokData(url)); } catch {}
+    if (images.length) {
+      const files = [];
+      for (let i = 0; i < images.length; i++) {
+        try {
+          files.push(await downloadDirect(images[i], (p) => onProgress(Math.round((i * 100 + p) / images.length))));
+        } catch (e) {
+          if (images.length === 1) throw e;
+        }
+      }
+      if (files.length) return files;
     }
+  }
+  try {
+    return [await ytdlp.download(url, libraryDir(), uniqueBase(), onProgress)];
+  } catch (e) {
+    if (/tiktok\.com/i.test(url)) return [await downloadDirect(await resolveTikTok(url), onProgress)];
     throw e;
   }
 }
@@ -348,10 +375,13 @@ function registerIpc() {
 
   ipcMain.handle('download', async (_e, url) => {
     try {
-      const file = await downloadAny(url, (pct) => sendToControl('progress', pct));
+      const files = await downloadAny(url, (pct) => sendToControl('progress', pct));
+      // prvá fotka navrchu v galérii (najnovší čas úpravy)
+      const now = Date.now() / 1000;
+      files.forEach((f, i) => { try { fs.utimesSync(f, now - i, now - i); } catch {} });
       config.links = [url.trim(), ...config.links.filter((l) => l !== url.trim())].slice(0, 50);
-      setCurrent(file);
-      return { ok: true, file };
+      setCurrent(files[0]);
+      return { ok: true, count: files.length };
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
     }

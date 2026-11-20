@@ -9,6 +9,7 @@ Android appka, ktorá nastaví **GIF alebo krátke video** ako živú tapetu na 
 - **yt-dlp sa aktualizuje sám** z GitHubu (pri spustení appky, max. raz za 6 h; podržaním tlačidla *Stiahnuť* vynútiš kontrolu)
 - **Moja galéria** – všetko stiahnuté sa uloží do appky aj do galérie telefónu (Filmy/AlexiaTapeta)
 - **TikTok** – vlož odkaz `vm.tiktok.com/…` alebo v TikToku daj *Zdieľať → Alexia Live Tapeta*
+- **TikTok fotkové príspevky** – keď je v príspevku viac obrázkov, stiahnu sa všetky
 - Zoznam „Moje TikToky a odkazy“ (pamätá si stiahnuté odkazy)
 - Bez zvuku / so zvukom, vyplniť celú obrazovku alebo zobraziť celé
 - Šetrí batériu – keď tapetu nevidno, prehrávanie sa pozastaví

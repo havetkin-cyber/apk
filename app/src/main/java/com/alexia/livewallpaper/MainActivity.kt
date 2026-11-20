@@ -159,20 +159,25 @@ class MainActivity : Activity() {
         progress.isIndeterminate = true
         io.execute {
             try {
-                val r = Downloader.download(this, url) { pct ->
+                val all = Downloader.downloadAll(this, url) { pct ->
                     main.post {
                         progress.isIndeterminate = false
                         progress.progress = pct
                         status.text = getString(R.string.downloading, pct)
                     }
                 }
-                val saved = WallpaperStore.commit(this, r.file, r.isVideo)
+                // od poslednej po prvú → prvá fotka je navrchu a nastaví sa ako tapeta
+                var inPhone = true
+                for (r in all.asReversed()) {
+                    val saved = WallpaperStore.commit(this, r.file, r.isVideo)
+                    inPhone = WallpaperStore.saveToPhoneGallery(this, saved, r.isVideo) && inPhone
+                }
                 rememberLink(url.trim())
-                val inPhone = WallpaperStore.saveToPhoneGallery(this, saved, r.isVideo)
                 main.post {
                     setBusy(false, null)
                     showCurrent()
-                    toast(getString(if (inPhone) R.string.saved_both else R.string.saved_app))
+                    val msg = getString(if (inPhone) R.string.saved_both else R.string.saved_app)
+                    toast(if (all.size > 1) "Stiahnutých ${all.size} obrázkov. $msg" else msg)
                 }
             } catch (e: Exception) {
                 main.post {

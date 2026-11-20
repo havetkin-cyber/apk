@@ -28,6 +28,7 @@
     <string name="gallery_note">Moje stiahnuté + voľne licencované videá z Wikimedia Commons</string>
     <string name="favorites">Moje TikToky a odkazy</string>
     <string-array name="default_links">
+        <item>https://vm.tiktok.com/ZN8mkYNFT/</item>
         <item>https://vm.tiktok.com/ZN8mhhvnH/</item>
         <item>https://vm.tiktok.com/ZN8mhuQKC/</item>
         <item>https://vm.tiktok.com/ZN8mhrtjf/</item>

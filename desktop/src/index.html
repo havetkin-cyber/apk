@@ -200,7 +200,7 @@ async function startDownload(url) {
   $('download').disabled = false;
   $('progressRow').style.display = 'none';
   if (r.ok) {
-    toast('Hotovo – nastavené ako tapeta a uložené do Mojej galérie ✓');
+    toast((r.count > 1 ? `Stiahnutých ${r.count} obrázkov – ` : 'Hotovo – ') + 'uložené do Mojej galérie, prvý je nastavený ako tapeta ✓');
     tab = 'mine'; setTabButtons();
   } else {
     toast('Sťahovanie zlyhalo: ' + r.error);

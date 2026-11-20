@@ -101,27 +101,58 @@ object Downloader {
     }
 
     /**
-     * TikTok stránky video priamo neobsahujú, preto použijeme verejnú
-     * službu tikwm.com, ktorá vráti priamy odkaz na MP4 (bez vodoznaku).
+     * TikTok cez verejnú službu tikwm.com (priame odkazy na MP4 bez
+     * vodoznaku a na všetky fotky vo fotkovom príspevku).
      */
-    private fun resolveTikTok(url: String): String {
+    private fun tikTokData(url: String): JSONObject {
         val api = "https://www.tikwm.com/api/?hd=1&url=" + URLEncoder.encode(url, "UTF-8")
         val conn = open(api)
         val body = conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
         conn.disconnect()
         val json = JSONObject(body)
         if (json.optInt("code", -1) != 0) {
-            throw IllegalStateException("TikTok video sa nepodarilo nájsť (" + json.optString("msg") + ")")
+            throw IllegalStateException("TikTok príspevok sa nepodarilo nájsť (" + json.optString("msg") + ")")
         }
-        val data = json.getJSONObject("data")
-        val play = listOf("hdplay", "play", "wmplay")
+        return json.getJSONObject("data")
+    }
+
+    /** Všetky fotky z TikTok fotkového príspevku (prázdne = je to video). */
+    private fun imagesOf(data: JSONObject): List<String> {
+        val arr = data.optJSONArray("images") ?: return emptyList()
+        return (0 until arr.length()).map { absolutize(arr.getString(it)) }.filter { it.isNotBlank() }
+    }
+
+    private fun resolveTikTok(url: String): String {
+        val data = tikTokData(url)
+        imagesOf(data).firstOrNull()?.let { return it }
+        return listOf("hdplay", "play", "wmplay")
             .map { data.optString(it) }
             .firstOrNull { it.isNotBlank() }
-        if (play != null) return absolutize(play)
-        // fotkový príspevok – zoberieme prvý obrázok
-        val images = data.optJSONArray("images")
-        if (images != null && images.length() > 0) return absolutize(images.getString(0))
-        throw IllegalStateException("V TikTok príspevku nie je video")
+            ?.let { absolutize(it) }
+            ?: throw IllegalStateException("V TikTok príspevku nie je video")
+    }
+
+    /**
+     * Stiahne všetko z odkazu. Pri TikTok príspevku s viacerými fotkami
+     * stiahne všetky fotky, inak jeden súbor (video/GIF).
+     */
+    fun downloadAll(context: Context, rawUrl: String, onProgress: (Int) -> Unit): List<Result> {
+        val url = normalize(rawUrl)
+        if (isTikTok(url)) {
+            val images = try { imagesOf(tikTokData(url)) } catch (_: Exception) { emptyList() }
+            if (images.isNotEmpty()) {
+                val results = ArrayList<Result>()
+                images.forEachIndexed { i, u ->
+                    try {
+                        results += downloadDirect(context, u, { p -> onProgress((i * 100 + p) / images.size) })
+                    } catch (e: Exception) {
+                        if (images.size == 1) throw e // pri viacerých preskočíme chybnú fotku
+                    }
+                }
+                if (results.isNotEmpty()) return results
+            }
+        }
+        return listOf(download(context, rawUrl, onProgress))
     }
 
     private fun absolutize(u: String) = if (u.startsWith("/")) "https://www.tikwm.com$u" else u

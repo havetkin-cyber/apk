@@ -92,10 +92,13 @@ object WallpaperStore {
 
     /** Presunie hotový súbor do "Moja galéria" a nastaví ho ako aktuálnu tapetu. */
     fun commit(context: Context, temp: File, isVideo: Boolean): File {
-        val target = File(
-            libraryDir(context),
-            "${System.currentTimeMillis()}.${if (isVideo) EXT_VIDEO else EXT_IMAGE}"
-        )
+        val ext = if (isVideo) EXT_VIDEO else EXT_IMAGE
+        var stamp = System.currentTimeMillis()
+        var target = File(libraryDir(context), "$stamp.$ext")
+        while (target.exists() || File(libraryDir(context), "$stamp.jpg").exists()) {
+            stamp++
+            target = File(libraryDir(context), "$stamp.$ext")
+        }
         if (!temp.renameTo(target)) {
             temp.copyTo(target, overwrite = true)
             temp.delete()
