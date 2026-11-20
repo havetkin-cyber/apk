@@ -42,20 +42,43 @@ object Downloader {
      * Stiahne priamy odkaz na GIF/video. Ak je odkaz na webovú stránku,
      * skúsi v nej nájsť video alebo GIF (og:video, <video src>, .gif/.mp4 odkazy).
      */
+    private val MEDIA_EXT = Regex("""\.(gif|webp|mp4|webm|mkv|mov)(\?.*)?$""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Univerzálne sťahovanie:
+     *  1. priamy odkaz na súbor (.gif, .mp4, …) → stiahne priamo
+     *  2. inak yt-dlp (TikTok, YouTube, Instagram, Reddit, X, …)
+     *  3. ak yt-dlp zlyhá: TikTok cez tikwm.com, iné stránky hľadaním videa v HTML
+     */
     fun download(context: Context, rawUrl: String, onProgress: (Int) -> Unit): Result {
-        var url = normalize(rawUrl)
-        if (isTikTok(url)) {
-            url = resolveTikTok(url)
+        val url = normalize(rawUrl)
+        val path = try { URL(url).path } catch (_: Exception) { "" }
+        if (MEDIA_EXT.containsMatchIn(path)) return downloadDirect(context, url, onProgress)
+
+        val ytError = try {
+            return YtDlp.download(context, url, onProgress)
+        } catch (e: Throwable) {
+            e
         }
+        return try {
+            if (isTikTok(url)) downloadDirect(context, resolveTikTok(url), onProgress)
+            else downloadDirect(context, url, onProgress)
+        } catch (fallback: Exception) {
+            throw IllegalStateException(ytError.message ?: fallback.message)
+        }
+    }
+
+    private fun downloadDirect(context: Context, url: String, onProgress: (Int) -> Unit, depth: Int = 0): Result {
         val conn = open(url)
         val mime = conn.contentType?.substringBefore(';')?.trim()?.lowercase()
 
         if (mime == null || mime.startsWith("text/html") || mime.startsWith("application/xhtml")) {
             val html = conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
             conn.disconnect()
+            if (depth > 1) throw IllegalStateException("Na stránke som nenašiel video ani GIF")
             val found = findMediaInHtml(html, conn.url.toString())
                 ?: throw IllegalStateException("Na stránke som nenašiel video ani GIF. Skús priamy odkaz.")
-            return download(context, found, onProgress)
+            return downloadDirect(context, found, onProgress, depth + 1)
         }
 
         val temp = try {

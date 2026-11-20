@@ -6,8 +6,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.media.MediaCodecList
-import android.media.MediaFormat
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -63,7 +61,7 @@ class GalleryActivity : Activity() {
     private var requestId = 0
 
     /** Najväčšie video (kratšia strana), ktoré tento telefón plynulo prehrá. */
-    private val maxShortSide: Int by lazy { detectMaxVideo() }
+    private val maxShortSide: Int by lazy { VideoCaps.maxShortSide() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -334,22 +332,6 @@ class GalleryActivity : Activity() {
         }
         val src = if (minOf(w, h) >= 2160) " (4K zdroj)" else ""
         return Item("▶ $res$src", thumb, url = bestUrl)
-    }
-
-    private fun detectMaxVideo(): Int {
-        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-        fun ok(w: Int, h: Int) = listOf(MediaFormat.MIMETYPE_VIDEO_VP9, MediaFormat.MIMETYPE_VIDEO_AVC).any { m ->
-            list.codecInfos.any { ci ->
-                !ci.isEncoder && ci.supportedTypes.any { it.equals(m, true) } && try {
-                    ci.getCapabilitiesForType(m).videoCapabilities.areSizeAndRateSupported(w, h, 30.0)
-                } catch (_: Exception) { false }
-            }
-        }
-        return when {
-            ok(3840, 2160) -> 2160
-            ok(2560, 1440) -> 1440
-            else -> 1080
-        }
     }
 
     // ---------- mriežka ----------

@@ -11,7 +11,7 @@
     <string name="ready_video">Video je pripravené ✓</string>
     <string name="ready_image">GIF / obrázok je pripravený ✓</string>
     <string name="error">Súbor sa nepodarilo načítať</string>
-    <string name="url_hint">Odkaz na GIF / video z webu</string>
+    <string name="url_hint">Odkaz: TikTok, YouTube, Instagram, web…</string>
     <string name="download">Stiahnuť</string>
     <string name="gallery">Galéria (moje + 4K z webu)</string>
     <string name="saved_both">Uložené do Mojej galérie aj do galérie telefónu ✓</string>

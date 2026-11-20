@@ -70,6 +70,7 @@ class MainActivity : Activity() {
             startActivityForResult(Intent(this, GalleryActivity::class.java), REQ_GALLERY)
         }
         findViewById<Button>(R.id.favorites).setOnClickListener { showFavorites() }
+        downloadBtn.setOnLongClickListener { forceUpdateYtDlp(); true }
         downloadBtn.setOnClickListener { startDownload(urlInput.text.toString()) }
         urlInput.setOnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_GO) { startDownload(urlInput.text.toString()); true } else false
@@ -180,6 +181,15 @@ class MainActivity : Activity() {
                     toast(getString(R.string.download_failed, e.message ?: e.javaClass.simpleName))
                 }
             }
+        }
+    }
+
+    private fun forceUpdateYtDlp() {
+        toast("Kontrolujem novú verziu yt-dlp…")
+        io.execute {
+            val updated = YtDlp.autoUpdate(this, force = true)
+            val v = updated ?: YtDlp.version(this)
+            main.post { toast(if (updated != null) "yt-dlp aktualizovaný na $v" else "yt-dlp je aktuálny ($v)") }
         }
     }
 
