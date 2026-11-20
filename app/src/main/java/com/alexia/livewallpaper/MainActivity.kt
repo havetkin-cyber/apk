@@ -124,7 +124,15 @@ class MainActivity : Activity() {
         if (resultCode != RESULT_OK || data == null) return
         when (requestCode) {
             REQ_PICK -> data.data?.let { importUri(it) }
-            REQ_GALLERY -> data.getStringExtra(GalleryActivity.EXTRA_URL)?.let { startDownload(it) }
+            REQ_GALLERY -> {
+                val local = data.getStringExtra(GalleryActivity.EXTRA_LOCAL)
+                if (local != null) {
+                    WallpaperStore.select(this, File(local), data.getBooleanExtra(GalleryActivity.EXTRA_IS_VIDEO, false))
+                    showCurrent()
+                } else {
+                    data.getStringExtra(GalleryActivity.EXTRA_URL)?.let { startDownload(it) }
+                }
+            }
         }
     }
 
@@ -157,9 +165,14 @@ class MainActivity : Activity() {
                         status.text = getString(R.string.downloading, pct)
                     }
                 }
-                WallpaperStore.commit(this, r.file, r.isVideo)
+                val saved = WallpaperStore.commit(this, r.file, r.isVideo)
                 rememberLink(url.trim())
-                main.post { setBusy(false, null); showCurrent() }
+                val inPhone = WallpaperStore.saveToPhoneGallery(this, saved, r.isVideo)
+                main.post {
+                    setBusy(false, null)
+                    showCurrent()
+                    toast(getString(if (inPhone) R.string.saved_both else R.string.saved_app))
+                }
             } catch (e: Exception) {
                 main.post {
                     setBusy(false, null)
@@ -247,7 +260,6 @@ class MainActivity : Activity() {
             status.text = getString(R.string.error) + " (formát videa nie je podporovaný)"
             true
         }
-        toast(getString(R.string.ready_video))
     }
 
     private fun showImage(file: File) {
@@ -273,7 +285,6 @@ class MainActivity : Activity() {
                 previewImage.visibility = View.VISIBLE
                 previewImage.setImageDrawable(d)
                 (d as? AnimatedImageDrawable)?.start()
-                toast(getString(R.string.ready_image))
             }
         }
     }

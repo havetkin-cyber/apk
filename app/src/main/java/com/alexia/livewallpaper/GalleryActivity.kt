@@ -1,10 +1,13 @@
 package com.alexia.livewallpaper
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.MediaCodecList
+import android.media.MediaFormat
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,19 +33,16 @@ import java.net.URLEncoder
 import java.util.concurrent.Executors
 
 /**
- * Galéria voľne licencovaných 4K videí a GIFov z Wikimedia Commons
- * (bez API kľúča). Ťuknutím sa položka vráti do MainActivity na stiahnutie.
+ * Galéria: "Moje stiahnuté" (všetko stiahnuté z TikToku/webu) +
+ * voľne licencované 4K videá a GIFy z Wikimedia Commons.
  */
 class GalleryActivity : Activity() {
 
-    data class Item(
-        val title: String,
-        val url: String,
-        val thumb: String?,
-        val width: Int,
-        val height: Int,
-        val bytes: Long,
-        val isVideo: Boolean
+    class Item(
+        val label: String,
+        val thumb: String?,          // URL alebo cesta k súboru
+        val url: String? = null,     // na stiahnutie
+        val local: WallpaperStore.LocalItem? = null
     )
 
     private val net = Executors.newFixedThreadPool(4)
@@ -57,15 +57,18 @@ class GalleryActivity : Activity() {
     private lateinit var spinner: ProgressBar
     private lateinit var searchBox: EditText
 
-    private var currentQuery = PRESETS[0].second
+    private var currentQuery: String? = null   // null = Moje stiahnuté
     private var nextOffset: Int? = null
     private var loading = false
     private var requestId = 0
 
+    /** Najväčšie video (kratšia strana), ktoré tento telefón plynulo prehrá. */
+    private val maxShortSide: Int by lazy { detectMaxVideo() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(buildUi())
-        search(currentQuery)
+        if (WallpaperStore.library(this).isNotEmpty()) showLocal() else search(PRESETS[0].second)
     }
 
     override fun onDestroy() {
@@ -73,7 +76,7 @@ class GalleryActivity : Activity() {
         super.onDestroy()
     }
 
-    // ---------- UI (bez XML, nech je to v jednom súbore) ----------
+    // ---------- UI ----------
 
     private fun dp(v: Int) = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics
@@ -98,7 +101,6 @@ class GalleryActivity : Activity() {
             textSize = 12f
         })
 
-        // vyhľadávanie
         val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         searchBox = EditText(this).apply {
             hint = getString(R.string.search_hint)
@@ -117,8 +119,13 @@ class GalleryActivity : Activity() {
         })
         root.addView(searchRow)
 
-        // rýchle kategórie
         val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        chips.addView(Button(this).apply {
+            text = getString(R.string.my_gallery)
+            isAllCaps = false
+            setTextColor(getColor(R.color.accent))
+            setOnClickListener { showLocal() }
+        })
         for ((label, query) in PRESETS) {
             chips.addView(Button(this).apply {
                 text = label
@@ -148,10 +155,18 @@ class GalleryActivity : Activity() {
             horizontalSpacing = dp(8)
             verticalSpacing = dp(8)
             adapter = this@GalleryActivity.adapter
-            setOnItemClickListener { _, _, pos, _ ->
-                val it = items[pos]
-                setResult(RESULT_OK, Intent().putExtra(EXTRA_URL, it.url))
-                finish()
+            setOnItemClickListener { _, _, pos, _ -> choose(items[pos]) }
+            setOnItemLongClickListener { _, _, pos, _ ->
+                val local = items[pos].local ?: return@setOnItemLongClickListener false
+                AlertDialog.Builder(this@GalleryActivity)
+                    .setMessage(R.string.delete_q)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        WallpaperStore.delete(this@GalleryActivity, local)
+                        showLocal()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+                true
             }
             setOnScrollListener(object : AbsListView.OnScrollListener {
                 override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) {}
@@ -164,12 +179,44 @@ class GalleryActivity : Activity() {
         return root
     }
 
-    private fun searchText() {
-        val t = searchBox.text.toString().trim()
-        if (t.isNotEmpty()) search("$t filetype:video filew:>1919")
+    private fun choose(item: Item) {
+        val data = Intent()
+        val local = item.local
+        if (local != null) {
+            data.putExtra(EXTRA_LOCAL, local.file.path).putExtra(EXTRA_IS_VIDEO, local.isVideo)
+        } else {
+            data.putExtra(EXTRA_URL, item.url ?: return)
+        }
+        setResult(RESULT_OK, data)
+        finish()
     }
 
-    // ---------- načítanie z Wikimedia Commons ----------
+    private fun searchText() {
+        val t = searchBox.text.toString().trim()
+        if (t.isNotEmpty()) search("$t filetype:video $UHD")
+    }
+
+    // ---------- Moje stiahnuté ----------
+
+    private fun showLocal() {
+        requestId++
+        currentQuery = null
+        nextOffset = null
+        loading = false
+        spinner.visibility = View.GONE
+        items.clear()
+        for (l in WallpaperStore.library(this)) {
+            items += Item(
+                label = if (l.isVideo) "▶ video" else "GIF / obrázok",
+                thumb = l.thumb.path.takeIf { l.thumb.exists() },
+                local = l
+            )
+        }
+        adapter.notifyDataSetChanged()
+        info.text = if (items.isEmpty()) getString(R.string.my_empty) else "Podrž prst na položke = vymazať"
+    }
+
+    // ---------- Wikimedia Commons ----------
 
     private fun search(query: String) {
         currentQuery = query
@@ -182,13 +229,13 @@ class GalleryActivity : Activity() {
     }
 
     private fun loadMore() {
+        val query = currentQuery ?: return
         val offset = nextOffset ?: return
         if (loading) return
         loading = true
         val myRequest = requestId
         spinner.visibility = View.VISIBLE
         info.text = ""
-        val query = currentQuery
         net.execute {
             try {
                 val (found, next) = fetch(query, offset)
@@ -200,7 +247,11 @@ class GalleryActivity : Activity() {
                     nextOffset = next
                     adapter.notifyDataSetChanged()
                     if (items.isEmpty()) {
-                        if (next != null) loadMore() else info.setText(R.string.nothing_found)
+                        when {
+                            next != null && offset < 300 -> loadMore()
+                            UHD in query -> search(query.replace(UHD, FHD)) // menej prísne
+                            else -> info.setText(R.string.nothing_found)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -215,36 +266,90 @@ class GalleryActivity : Activity() {
     }
 
     private fun fetch(query: String, offset: Int): Pair<List<Item>, Int?> {
-        val url = "https://commons.wikimedia.org/w/api.php?action=query&format=json" +
+        val url = "https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2" +
             "&generator=search&gsrnamespace=6&gsrlimit=30&gsroffset=$offset" +
             "&gsrsearch=" + URLEncoder.encode(query, "UTF-8") +
-            "&prop=imageinfo&iiprop=url%7Csize%7Cmime&iiurlwidth=480"
+            "&prop=videoinfo&viprop=url%7Csize%7Cmime%7Cderivatives&viurlwidth=480"
         val conn = Downloader.open(url)
         val body = conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
         conn.disconnect()
 
         val json = JSONObject(body)
         val next = json.optJSONObject("continue")?.optInt("gsroffset", -1)?.takeIf { it >= 0 }
-        val pages = json.optJSONObject("query")?.optJSONObject("pages") ?: return emptyList<Item>() to next
+        val pages = json.optJSONObject("query")?.optJSONArray("pages") ?: return emptyList<Item>() to next
 
         val list = ArrayList<Pair<Int, Item>>()
-        val keys = pages.keys()
-        while (keys.hasNext()) {
-            val p = pages.getJSONObject(keys.next())
-            val ii = p.optJSONArray("imageinfo")?.optJSONObject(0) ?: continue
-            val mime = ii.optString("mime")
-            if (mime !in SUPPORTED_MIME) continue // napr. .ogv Android neprehrá
-            list += p.optInt("index") to Item(
-                title = p.optString("title").removePrefix("File:"),
-                url = ii.optString("url"),
-                thumb = ii.optString("thumburl").ifBlank { null },
-                width = ii.optInt("width"),
-                height = ii.optInt("height"),
-                bytes = ii.optLong("size"),
-                isVideo = mime.startsWith("video/")
-            )
+        for (i in 0 until pages.length()) {
+            val p = pages.getJSONObject(i)
+            val vi = (p.optJSONArray("videoinfo") ?: p.optJSONArray("imageinfo"))?.optJSONObject(0) ?: continue
+            val item = toItem(vi) ?: continue
+            list += p.optInt("index") to item
         }
         return list.sortedBy { it.first }.map { it.second } to next
+    }
+
+    /**
+     * Pre videá neberieme originál (často obrovský alebo .ogv, ktorý Android
+     * neprehrá), ale hotovú WebM verziu od Wikimedie v takom rozlíšení,
+     * aké tento telefón zvládne.
+     */
+    private fun toItem(vi: JSONObject): Item? {
+        val mime = vi.optString("mime")
+        val thumb = vi.optString("thumburl").ifBlank { null }
+        val w = vi.optInt("width")
+        val h = vi.optInt("height")
+
+        if (mime == "image/gif" || mime == "image/webp") {
+            val mb = vi.optLong("size") / (1024.0 * 1024.0)
+            return Item("GIF · ${w}×${h} · ${"%.0f".format(mb.coerceAtLeast(1.0))} MB", thumb, url = vi.optString("url"))
+        }
+        if (!mime.startsWith("video/") && mime != "application/ogg") return null
+
+        var bestUrl: String? = null
+        var bestShort = 0
+        var bestScore = -1
+        val ders = vi.optJSONArray("derivatives")
+        if (ders != null) for (i in 0 until ders.length()) {
+            val d = ders.getJSONObject(i)
+            val type = d.optString("type")
+            if (!type.startsWith("video/webm") && !type.startsWith("video/mp4")) continue
+            val short = minOf(d.optInt("width"), d.optInt("height"))
+            if (short <= 0 || short > maxShortSide) continue
+            val score = short * 10 + if (type.contains("vp9")) 1 else 0
+            if (score > bestScore) {
+                bestScore = score; bestShort = short; bestUrl = d.optString("src")
+            }
+        }
+        // bez prevodu: originál len ak je to webm/mp4 a telefón ho zvládne
+        if (bestUrl.isNullOrBlank()) {
+            if ((mime == "video/webm" || mime == "video/mp4") && minOf(w, h) <= maxShortSide) {
+                bestUrl = vi.optString("url"); bestShort = minOf(w, h)
+            } else return null
+        }
+        val res = when {
+            bestShort >= 2160 -> "4K"
+            bestShort >= 1440 -> "1440p"
+            bestShort >= 1080 -> "1080p"
+            else -> "${bestShort}p"
+        }
+        val src = if (minOf(w, h) >= 2160) " (4K zdroj)" else ""
+        return Item("▶ $res$src", thumb, url = bestUrl)
+    }
+
+    private fun detectMaxVideo(): Int {
+        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+        fun ok(w: Int, h: Int) = listOf(MediaFormat.MIMETYPE_VIDEO_VP9, MediaFormat.MIMETYPE_VIDEO_AVC).any { m ->
+            list.codecInfos.any { ci ->
+                !ci.isEncoder && ci.supportedTypes.any { it.equals(m, true) } && try {
+                    ci.getCapabilitiesForType(m).videoCapabilities.areSizeAndRateSupported(w, h, 30.0)
+                } catch (_: Exception) { false }
+            }
+        }
+        return when {
+            ok(3840, 2160) -> 2160
+            ok(2560, 1440) -> 1440
+            else -> 1080
+        }
     }
 
     // ---------- mriežka ----------
@@ -272,17 +377,7 @@ class GalleryActivity : Activity() {
             }
             val item = items[position]
             val img = cell.findViewById<ImageView>(android.R.id.icon)
-            val label = cell.findViewById<TextView>(android.R.id.text1)
-
-            val res = when {
-                item.width >= 3840 -> "4K"
-                item.width >= 2560 -> "2K"
-                item.width >= 1920 -> "Full HD"
-                else -> "${item.width}×${item.height}"
-            }
-            val kind = if (item.isVideo) "▶ video" else "GIF"
-            val mb = item.bytes / (1024.0 * 1024.0)
-            label.text = "$kind · $res · ${"%.0f".format(mb.coerceAtLeast(1.0))} MB"
+            cell.findViewById<TextView>(android.R.id.text1).text = item.label
 
             img.tag = item.thumb
             img.setImageBitmap(null)
@@ -293,8 +388,10 @@ class GalleryActivity : Activity() {
             } else {
                 net.execute {
                     val bmp = try {
-                        val c = Downloader.open(t)
-                        c.inputStream.use { BitmapFactory.decodeStream(it) }.also { c.disconnect() }
+                        if (t.startsWith("http")) {
+                            val c = Downloader.open(t)
+                            c.inputStream.use { BitmapFactory.decodeStream(it) }.also { c.disconnect() }
+                        } else BitmapFactory.decodeFile(t)
                     } catch (_: Exception) { null }
                     if (bmp != null) {
                         thumbs.put(t, bmp)
@@ -308,18 +405,19 @@ class GalleryActivity : Activity() {
 
     companion object {
         const val EXTRA_URL = "url"
+        const val EXTRA_LOCAL = "local"
+        const val EXTRA_IS_VIDEO = "is_video"
 
         private const val UHD = "filew:>3839"
+        private const val FHD = "filew:>1919"
         val PRESETS = listOf(
             "4K videá" to "filetype:video $UHD",
             "Príroda 4K" to "nature filetype:video $UHD",
             "Vesmír 4K" to "space filetype:video $UHD",
             "Oceán 4K" to "ocean filetype:video $UHD",
             "Mesto 4K" to "city filetype:video $UHD",
-            "Full HD videá" to "filetype:video filew:>1919",
+            "Full HD videá" to "filetype:video $FHD",
             "GIFy" to "animated filemime:image/gif filew:>700",
         )
-
-        private val SUPPORTED_MIME = setOf("video/webm", "video/mp4", "image/gif", "image/webp")
     }
 }

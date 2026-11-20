@@ -13,13 +13,19 @@
     <string name="error">Súbor sa nepodarilo načítať</string>
     <string name="url_hint">Odkaz na GIF / video z webu</string>
     <string name="download">Stiahnuť</string>
-    <string name="gallery">Galéria 4K z webu</string>
+    <string name="gallery">Galéria (moje + 4K z webu)</string>
+    <string name="saved_both">Uložené do Mojej galérie aj do galérie telefónu ✓</string>
+    <string name="saved_app">Uložené do Mojej galérie ✓</string>
+    <string name="my_gallery">Moje stiahnuté</string>
+    <string name="my_empty">Zatiaľ nič. Stiahni TikTok alebo video z webu a objaví sa tu.</string>
+    <string name="delete_q">Vymazať z Mojej galérie?</string>
+    <string name="delete">Vymazať</string>
     <string name="downloading">Sťahujem… %1$d %%</string>
     <string name="download_failed">Sťahovanie zlyhalo: %1$s</string>
     <string name="search_hint">Hľadať (napr. ocean, space, fire)</string>
     <string name="search">Hľadať</string>
     <string name="nothing_found">Nič sa nenašlo</string>
-    <string name="gallery_note">Voľne licencované súbory z Wikimedia Commons</string>
+    <string name="gallery_note">Moje stiahnuté + voľne licencované videá z Wikimedia Commons</string>
     <string name="favorites">Moje TikToky a odkazy</string>
     <string-array name="default_links">
         <item>https://vm.tiktok.com/ZN8mhhvnH/</item>
