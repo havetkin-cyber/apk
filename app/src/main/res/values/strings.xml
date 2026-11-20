@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alexia Live Tapeta</string>
+    <string name="wallpaper_desc">GIF alebo krátke video ako pozadie</string>
+    <string name="pick">Vybrať GIF / video</string>
+    <string name="apply">Nastaviť ako tapetu</string>
+    <string name="mute">Bez zvuku (video)</string>
+    <string name="fill">Vyplniť celú obrazovku (orezať)</string>
+    <string name="empty">Zatiaľ nie je vybraté nič.\nVyber GIF alebo krátke video.</string>
+    <string name="loading">Načítavam…</string>
+    <string name="ready_video">Video je pripravené ✓</string>
+    <string name="ready_image">GIF / obrázok je pripravený ✓</string>
+    <string name="error">Súbor sa nepodarilo načítať</string>
+    <string name="url_hint">Odkaz na GIF / video z webu</string>
+    <string name="download">Stiahnuť</string>
+    <string name="gallery">Galéria 4K z webu</string>
+    <string name="downloading">Sťahujem… %1$d %%</string>
+    <string name="download_failed">Sťahovanie zlyhalo: %1$s</string>
+    <string name="search_hint">Hľadať (napr. ocean, space, fire)</string>
+    <string name="search">Hľadať</string>
+    <string name="nothing_found">Nič sa nenašlo</string>
+    <string name="gallery_note">Voľne licencované súbory z Wikimedia Commons</string>
+    <string name="favorites">Moje TikToky a odkazy</string>
+    <string-array name="default_links">
+        <item>https://vm.tiktok.com/ZN8mhuQKC/</item>
+        <item>https://vm.tiktok.com/ZN8mhrtjf/</item>
+        <item>https://vm.tiktok.com/ZN8mhUkoK/</item>
+    </string-array>
+    <string name="no_chooser">Telefón nepodporuje výber živej tapety</string>
+</resources>
