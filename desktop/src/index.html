@@ -66,6 +66,9 @@
 <main id="content"></main>
 
 <footer>
+  <span id="appver">Appka: …</span>
+  <a id="appupdate" style="display:none;color:#c4b5fd;font-weight:bold"></a>
+  <a id="checkapp">Skontrolovať aktualizáciu appky</a>
   <span id="ytver">yt-dlp: …</span>
   <a id="update">Skontrolovať aktualizáciu yt-dlp</a>
   <a id="folder">Otvoriť priečinok</a>
@@ -103,6 +106,7 @@ async function refresh() {
   $('fill').checked = state.config.fill;
   $('autostart').checked = state.config.autostart;
   $('pause').textContent = state.media.paused ? '▶ Spustiť' : '⏸ Pozastaviť';
+  showAppUpdate(state.appUpdate);
   render();
 }
 
@@ -243,6 +247,24 @@ $('update').onclick = async () => {
     toast(r.updated ? 'yt-dlp aktualizovaný na ' + r.updated : 'yt-dlp je aktuálny');
   } catch (e) { toast('Aktualizácia zlyhala: ' + e.message); }
 };
+
+function showAppUpdate(u) {
+  const a = $('appupdate');
+  if (!u) { a.style.display = 'none'; return; }
+  a.textContent = `⬆ Nová verzia ${u.version} – stiahnuť`;
+  a.style.display = 'inline';
+}
+$('appupdate').onclick = () => api.openUpdate();
+$('checkapp').onclick = async () => {
+  toast('Kontrolujem novú verziu appky…');
+  try {
+    const u = await api.checkAppUpdate();
+    showAppUpdate(u);
+    toast(u ? `Je dostupná verzia ${u.version}` : 'Máš najnovšiu verziu');
+  } catch (e) { toast('Kontrola zlyhala: ' + e.message); }
+};
+api.on('app-update', (u) => { showAppUpdate(u); toast(`Je dostupná nová verzia ${u.version}`); });
+api.appVersion().then((v) => ($('appver').textContent = 'Appka: ' + v));
 
 api.on('progress', (p) => { $('progress').value = p; });
 api.on('state-changed', refresh);

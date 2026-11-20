@@ -34,5 +34,6 @@
         <item>https://vm.tiktok.com/ZN8mhrtjf/</item>
         <item>https://vm.tiktok.com/ZN8mhUkoK/</item>
     </string-array>
+    <string name="updates">Aktualizácie</string>
     <string name="no_chooser">Telefón nepodporuje výber živej tapety</string>
 </resources>

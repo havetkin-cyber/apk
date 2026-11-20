@@ -7,6 +7,7 @@ Android appka, ktorá nastaví **GIF alebo krátke video** ako živú tapetu na 
 - **Galéria 4K z webu** – voľne licencované 4K videá a GIFy z Wikimedia Commons (príroda, vesmír, oceán, mesto…), s hľadaním
 - **Stiahnuť z webu cez yt-dlp** – TikTok, YouTube, Instagram, Reddit, X a 1000+ ďalších stránok, aj priame odkazy na GIF/MP4
 - **yt-dlp sa aktualizuje sám** z GitHubu (pri spustení appky, max. raz za 6 h; podržaním tlačidla *Stiahnuť* vynútiš kontrolu)
+- **Aktualizácie appky** – appka sama zistí novú verziu v Releases a ponúkne jej stiahnutie a inštaláciu (tlačidlo *Aktualizácie*)
 - **Moja galéria** – všetko stiahnuté sa uloží do appky aj do galérie telefónu (Filmy/AlexiaTapeta)
 - **TikTok** – vlož odkaz `vm.tiktok.com/…` alebo v TikToku daj *Zdieľať → Alexia Live Tapeta*
 - **TikTok fotkové príspevky** – keď je v príspevku viac obrázkov, stiahnu sa všetky

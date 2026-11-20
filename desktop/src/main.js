@@ -343,6 +343,34 @@ async function commonsSearch(query, offset) {
   return { items, next };
 }
 
+// ---------------- aktualizácia appky ----------------
+
+let availableUpdate = null;
+
+function isNewer(remote, local) {
+  const r = remote.split('.').map((x) => parseInt(x, 10) || 0);
+  const l = local.split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    if ((r[i] || 0) !== (l[i] || 0)) return (r[i] || 0) > (l[i] || 0);
+  }
+  return false;
+}
+
+async function checkAppUpdate() {
+  const res = await net.fetch('https://api.github.com/repos/havetkin-cyber/apk/releases/latest', {
+    headers: { 'User-Agent': 'AlexiaLiveTapeta', Accept: 'application/vnd.github+json' },
+  });
+  const json = await res.json();
+  const version = String(json.tag_name || '').replace(/^v/, '');
+  if (version && isNewer(version, app.getVersion())) {
+    availableUpdate = { version, url: json.html_url };
+    sendToControl('app-update', availableUpdate);
+  } else {
+    availableUpdate = null;
+  }
+  return availableUpdate;
+}
+
 // ---------------- IPC ----------------
 
 function registerIpc() {
@@ -351,9 +379,14 @@ function registerIpc() {
     config,
     media: mediaState(),
     platform: process.platform,
+    appUpdate: availableUpdate,
   }));
 
   ipcMain.handle('ytdlp-version', () => ytdlp.version());
+
+  ipcMain.handle('app-version', () => app.getVersion());
+  ipcMain.handle('check-app-update', () => checkAppUpdate());
+  ipcMain.handle('open-update', () => availableUpdate && shell.openExternal(availableUpdate.url));
 
   ipcMain.handle('ytdlp-update', async () => {
     const updated = await ytdlp.ensureUpdated(true);
@@ -447,8 +480,11 @@ app.whenReady().then(() => {
   ytdlp.ensureUpdated(false)
     .then((v) => v && sendToControl('toast', `yt-dlp aktualizovaný na ${v}`))
     .catch((e) => console.error('yt-dlp update', e));
+  // kontrola novej verzie appky v GitHub Releases
+  checkAppUpdate().catch(() => {});
   // a potom každých 6 hodín, kým appka beží
   setInterval(() => {
+    checkAppUpdate().catch(() => {});
     ytdlp.ensureUpdated(false)
       .then((v) => v && sendToControl('toast', `yt-dlp aktualizovaný na ${v}`))
       .catch(() => {});

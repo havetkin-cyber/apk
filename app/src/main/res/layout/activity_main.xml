@@ -121,6 +121,13 @@
         android:text="@string/favorites" />
 
     <Button
+        android:id="@+id/updates"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:text="@string/updates" />
+
+    <Button
         android:id="@+id/apply"
         android:layout_width="match_parent"
         android:layout_height="56dp"

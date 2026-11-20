@@ -11,8 +11,10 @@ android {
         applicationId = "com.alexia.livewallpaper"
         minSdk = 28
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.0"
+        // číslo buildu z GitHub Actions = číslo verzie v Releases (v2.0.N)
+        val run = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionCode = run
+        versionName = "2.0.$run"
 
         // yt-dlp (Python) je natívna knižnica – len pre bežné mobily
         ndk {
@@ -59,4 +61,5 @@ android {
 dependencies {
     // yt-dlp pre Android (Python + yt-dlp), aktualizuje sa z GitHubu za behu
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.4")
+    implementation("androidx.core:core:1.13.1") // FileProvider na inštaláciu aktualizácie
 }

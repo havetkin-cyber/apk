@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('alexia', {
   getState: () => ipcRenderer.invoke('get-state'),
+  appVersion: () => ipcRenderer.invoke('app-version'),
+  checkAppUpdate: () => ipcRenderer.invoke('check-app-update'),
+  openUpdate: () => ipcRenderer.invoke('open-update'),
   ytdlpVersion: () => ipcRenderer.invoke('ytdlp-version'),
   ytdlpUpdate: () => ipcRenderer.invoke('ytdlp-update'),
   pickFile: () => ipcRenderer.invoke('pick-file'),
@@ -14,7 +17,7 @@ contextBridge.exposeInMainWorld('alexia', {
   commons: (q, offset) => ipcRenderer.invoke('commons', q, offset),
   openFolder: () => ipcRenderer.invoke('open-folder'),
   on: (channel, cb) => {
-    if (['media', 'progress', 'state-changed', 'toast'].includes(channel)) {
+    if (['media', 'progress', 'state-changed', 'toast', 'app-update'].includes(channel)) {
       ipcRenderer.on(channel, (_e, data) => cb(data));
     }
   },

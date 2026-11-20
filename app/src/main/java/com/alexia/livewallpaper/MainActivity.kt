@@ -70,6 +70,7 @@ class MainActivity : Activity() {
             startActivityForResult(Intent(this, GalleryActivity::class.java), REQ_GALLERY)
         }
         findViewById<Button>(R.id.favorites).setOnClickListener { showFavorites() }
+        findViewById<Button>(R.id.updates).setOnClickListener { showUpdates() }
         downloadBtn.setOnLongClickListener { forceUpdateYtDlp(); true }
         downloadBtn.setOnClickListener { startDownload(urlInput.text.toString()) }
         urlInput.setOnEditorActionListener { _, id, _ ->
@@ -79,6 +80,25 @@ class MainActivity : Activity() {
 
         showCurrent()
         handleShare(intent)
+
+        // automatická kontrola novej verzie appky (max. raz za 6 h)
+        if (AppUpdater.shouldAutoCheck(this)) {
+            io.execute {
+                val r = try { AppUpdater.check(this) } catch (_: Exception) { null }
+                if (r != null) main.post { if (!isFinishing) offerUpdate(r) }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // používateľ sa vrátil z povolenia "Inštalovať neznáme aplikácie"
+        pendingApk?.let { apk ->
+            if (packageManager.canRequestPackageInstalls()) {
+                pendingApk = null
+                AppUpdater.install(this, apk)
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -184,6 +204,84 @@ class MainActivity : Activity() {
                     setBusy(false, null)
                     showCurrent()
                     toast(getString(R.string.download_failed, e.message ?: e.javaClass.simpleName))
+                }
+            }
+        }
+    }
+
+    // ---------- aktualizácie ----------
+
+    private var pendingApk: File? = null
+
+    private fun showUpdates() {
+        val appV = AppUpdater.currentVersion(this)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.updates)
+            .setMessage("Appka: $appV\nyt-dlp: zisťujem…\n\nyt-dlp sa aktualizuje sám pri spustení appky (max. raz za 6 h).")
+            .setPositiveButton("Skontrolovať appku") { _, _ -> checkAppUpdate() }
+            .setNeutralButton("Aktualizovať yt-dlp") { _, _ -> forceUpdateYtDlp() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+        io.execute {
+            val v = YtDlp.version(this) ?: "?"
+            main.post {
+                if (dialog.isShowing) dialog.setMessage(
+                    "Appka: $appV\nyt-dlp: $v\n\nyt-dlp sa aktualizuje sám pri spustení appky (max. raz za 6 h)."
+                )
+            }
+        }
+    }
+
+    private fun checkAppUpdate() {
+        toast("Kontrolujem novú verziu appky…")
+        io.execute {
+            try {
+                val r = AppUpdater.check(this)
+                main.post {
+                    if (r != null) offerUpdate(r)
+                    else toast("Máš najnovšiu verziu (${AppUpdater.currentVersion(this)})")
+                }
+            } catch (e: Exception) {
+                main.post { toast("Kontrola zlyhala: ${e.message}") }
+            }
+        }
+    }
+
+    private fun offerUpdate(r: AppUpdater.Release) {
+        val mb = (r.sizeBytes / 1048576).coerceAtLeast(1)
+        AlertDialog.Builder(this)
+            .setTitle("Nová verzia ${r.version}")
+            .setMessage("Máš ${AppUpdater.currentVersion(this)}. Stiahnuť a nainštalovať novú verziu ($mb MB)?")
+            .setPositiveButton("Aktualizovať") { _, _ -> downloadUpdate(r) }
+            .setNegativeButton("Neskôr", null)
+            .show()
+    }
+
+    private fun downloadUpdate(r: AppUpdater.Release) {
+        setBusy(true, "Sťahujem aktualizáciu…")
+        progress.isIndeterminate = true
+        io.execute {
+            try {
+                val apk = AppUpdater.download(this, r) { pct ->
+                    main.post {
+                        progress.isIndeterminate = false
+                        progress.progress = pct
+                        status.text = "Sťahujem aktualizáciu… $pct %"
+                    }
+                }
+                main.post {
+                    setBusy(false, null)
+                    showCurrent()
+                    if (!AppUpdater.install(this, apk)) {
+                        pendingApk = apk
+                        toast("Povoľ inštaláciu z tejto appky a vráť sa späť")
+                    }
+                }
+            } catch (e: Exception) {
+                main.post {
+                    setBusy(false, null)
+                    showCurrent()
+                    toast("Aktualizácia zlyhala: ${e.message}")
                 }
             }
         }
