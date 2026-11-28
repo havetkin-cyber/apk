@@ -472,7 +472,7 @@ app.whenReady().then(() => {
   createTray();
   createWallpaperWindows();
   createControlWindow(!process.argv.includes('--hidden'));
-  if (postava) { if (process.env.POSTAVA_TEST) config.postava = true; postava.init(config, saveConfig, updateTrayMenu); updateTrayMenu(); }
+  if (postava) { if (process.env.POSTAVA_TEST) { config.postava = true; config.postavaTanec = false; } postava.init(config, saveConfig, updateTrayMenu); updateTrayMenu(); }
 
   let rebuild = null;
   const rebuildLater = () => {
