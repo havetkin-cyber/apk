@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const P = window.postava;
+window.__postavaBezi = true;
 const W = innerWidth, H = innerHeight;
 const PLOCHA = Math.round(H * 0.62);        // riadok povrchu (rovnako ako v main.js)
 const VYSKA_SVETA = 2.8;                     // m na výšku okna
@@ -20,7 +21,10 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const sirka = W / M;
 const camera = new THREE.OrthographicCamera(-sirka / 2, sirka / 2, hore, -dole, 0.1, 20);
-camera.position.set(0, 0, 5);
+// kamera mierne zhora (nie spod sukne)
+const SKLON = 18 * Math.PI / 180;
+camera.position.set(0, Math.sin(SKLON) * 5, Math.cos(SKLON) * 5);
+camera.lookAt(0, 0, 0);
 scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 const svetlo = new THREE.DirectionalLight(0xffffff, 1.6);
 svetlo.position.set(1, 2, 3);
@@ -36,6 +40,7 @@ let hovori = 0;            // do kedy hýbe ústami
 let akcia = null, akciaOd = 0;
 let otocenie = 0;          // aktuálne otočenie tela (rad)
 let vyskaBokov = 0.9;
+let f = 1, zaklad = 0;     // f = -1 keď je model otočený dozadu (−Z): osi X a Z kostí sú zrkadlené
 
 // ---------------- načítanie VRM ----------------
 const loader = new GLTFLoader();
@@ -54,7 +59,12 @@ async function nacitaj(url) {
   if (vrm.lookAt) vrm.lookAt.target = ciel;
   // výška bokov v pokoji (na sadnutie presne na okraj)
   vrm.humanoid.resetNormalizedPose();
+  vrm.scene.rotation.set(0, 0, 0);          // smer meriame v priestore modelu (rotateVRM0 by to skreslil)
   vrm.scene.updateMatrixWorld(true);
+  // ktorým smerom je model otočený: ľavá noha postavy má byť pri pohľade spredu vpravo (+X)
+  const lx = new THREE.Vector3().setFromMatrixPosition(vrm.humanoid.getNormalizedBoneNode('leftUpperLeg').matrixWorld).x;
+  const rx = new THREE.Vector3().setFromMatrixPosition(vrm.humanoid.getNormalizedBoneNode('rightUpperLeg').matrixWorld).x;
+  f = lx >= rx ? 1 : -1; zaklad = f > 0 ? 0 : Math.PI;
   const boky = vrm.humanoid.getNormalizedBoneNode('hips');
   vyskaBokov = boky ? new THREE.Vector3().setFromMatrixPosition(boky.matrixWorld).y : 0.9;
   // veľmi veľké / malé modely zmenšiť na ~1,55 m
@@ -242,7 +252,14 @@ async function spustiUcho() {
         uderOd = teraz; uderov++;
       }
       // hudba hrá, keď je zvuk stály a má údery; vlastný hlas postavičky sa nepočíta
-      const hra = celk > 18 && teraz - posledny < 2.5 && !analyzer;
+      // pravidelnosť úderov (hudba má stály rytmus, šum nie)
+      let pravidelne = false;
+      if (intervaly.length >= 6) {
+        const p = intervaly.reduce((a, x) => a + x, 0) / intervaly.length;
+        const odch = Math.sqrt(intervaly.reduce((a, x) => a + (x - p) ** 2, 0) / intervaly.length);
+        pravidelne = odch / p < 0.35;
+      }
+      const hra = celk > 25 && pravidelne && teraz - posledny < 2.5 && !analyzer;
       if (hra) { tichoOd = 0; if (!hudbaOd) hudbaOd = teraz; } else { hudbaOd = 0; if (!tichoOd) tichoOd = teraz; }
       const ma = tanecPovoleny && hudbaOd && teraz - hudbaOd > 2.5;
       const prestan = tichoOd && teraz - tichoOd > 3;
@@ -254,7 +271,7 @@ async function spustiUcho() {
 
 // ---------------- pózy ----------------
 const kost = (n) => vrm?.humanoid.getNormalizedBoneNode(n);
-function rot(n, x = 0, y = 0, z = 0) { const b = kost(n); if (b) b.rotation.set(x, y, z); }
+function rot(n, x = 0, y = 0, z = 0) { const b = kost(n); if (b) b.rotation.set(x * f, y, z * f); }
 
 function poza(t) {
   const s = Math.sin, d = 0.6; // d – sila pohybu
@@ -293,13 +310,13 @@ function poza(t) {
     }
   } else if (stav === 'sedi' || stav === 'stoji') {
     // sedí na okraji, nohy visia a hompáľajú sa
-    rot('leftUpperLeg', -1.5, 0.05, 0.08);
-    rot('rightUpperLeg', -1.5, -0.05, -0.08);
+    rot('leftUpperLeg', -1.5, 0, -0.04);      // kolená k sebe
+    rot('rightUpperLeg', -1.5, 0, 0.04);
     rot('leftLowerLeg', 1.35 + s(t * 2.1) * 0.22, 0, 0);
     rot('rightLowerLeg', 1.35 + s(t * 2.1 + 2.2) * 0.22, 0, 0);
-    // ruky opreté vedľa seba
-    rot('leftUpperArm', 0.35, 0, -1.25); rot('rightUpperArm', 0.35, 0, 1.25);
-    rot('leftLowerArm', 0, -0.3, 0); rot('rightLowerArm', 0, 0.3, 0);
+    // ruky v lone
+    rot('leftUpperArm', -0.35, 0, -1.2); rot('rightUpperArm', -0.35, 0, 1.2);
+    rot('leftLowerArm', 0, -1.1, 0); rot('rightLowerArm', 0, 1.1, 0);
     if (urazena) { rot('leftUpperArm', 0.9, 0.6, -1.0); rot('rightUpperArm', 0.9, -0.6, 1.0); rot('leftLowerArm', 0, -1.9, 0); rot('rightLowerArm', 0, 1.9, 0); } // ruky prekrížené
     if (nalada < -40 && !urazena) rot('head', -0.05, 0, s(t * 0.7) * 0.05);
   } else if (stav === 'chodi') {
@@ -327,7 +344,7 @@ function poza(t) {
   let cielOtocenia = urazena && !tanci ? Math.PI : stav === 'chodi' ? smer * Math.PI / 2 : 0;
   if (moznoTancit && Math.floor(uderov / 8) % 4 === 1) cielOtocenia = Math.sin(performance.now() / 1000 * Math.PI / Math.max(0.3, interval) / 4) * 0.5;
   otocenie += (cielOtocenia - otocenie) * 0.08;
-  vrm.scene.rotation.y = otocenie;
+  vrm.scene.rotation.y = zaklad + otocenie;
 
   // výška: sedí boky na povrchu, inak nohy na povrchu
   const sedi = (stav === 'sedi' || stav === 'stoji') && !moznoTancit;

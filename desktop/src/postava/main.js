@@ -132,6 +132,26 @@ function vytvor() {
   });
   win.loadFile(path.join(__dirname, 'index.html'));
   win.once('ready-to-show', () => win.showInactive());
+  // test na GitHube: vypíš konzolu, po 60 s urob snímku a skonči
+  if (process.env.POSTAVA_TEST) {
+    const zapis = (t) => { try { fs.appendFileSync(process.env.POSTAVA_TEST + '.log', t + '\n'); } catch {} };
+    win.webContents.on('console-message', (e, lvl, msg, line, src) => zapis(`[konzola] ${e.message ?? msg} (${e.sourceId ?? src}:${e.lineNumber ?? line})`));
+    win.webContents.on('render-process-gone', (e, d) => zapis('[pád] ' + JSON.stringify(d)));
+    win.webContents.on('did-fail-load', (e, k, d, u) => zapis(`[nenačítané] ${k} ${d} ${u}`));
+    win.webContents.on('did-finish-load', () => zapis('[načítané]'));
+    setTimeout(() => win.webContents.executeJavaScript(`Promise.all([
+        import('three').then(() => 'three ok', (e) => 'three: ' + e.message),
+        import('@pixiv/three-vrm').then(() => 'vrm ok', (e) => 'vrm: ' + e.message),
+        import('three/addons/loaders/GLTFLoader.js').then(() => 'gltf ok', (e) => 'gltf: ' + e.message),
+        import('./render.js?x=1').then(() => 'render ok', (e) => 'render: ' + e.message),
+      ]).then((r) => r.join(' | '))`).then((r) => zapis('[importy] ' + r)).catch((e) => zapis('[importy chyba] ' + e)), 20000);
+    setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 135000);
+    setTimeout(async () => {
+      try { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.POSTAVA_TEST, img.toPNG()); }
+      catch (e) { console.log('[postava] snímka zlyhala', e); }
+      app.exit(0);
+    }, 140000);
+  }
   win.on('closed', () => { win = null; zastavCasovace(); });
   stav = 'sedi'; naOkne = null;
   spustiSlucku();
