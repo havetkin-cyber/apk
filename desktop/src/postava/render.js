@@ -56,6 +56,7 @@ async function nacitaj(url) {
   if (vrm.lookAt) vrm.lookAt.target = ciel;
   // výška bokov v pokoji (na sadnutie presne na okraj)
   vrm.humanoid.resetNormalizedPose();
+  vrm.scene.rotation.set(0, 0, 0);          // smer meriame v priestore modelu (rotateVRM0 by to skreslil)
   vrm.scene.updateMatrixWorld(true);
   // ktorým smerom je model otočený: ľavá noha postavy má byť pri pohľade spredu vpravo (+X)
   const lx = new THREE.Vector3().setFromMatrixPosition(vrm.humanoid.getNormalizedBoneNode('leftUpperLeg').matrixWorld).x;
