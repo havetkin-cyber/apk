@@ -134,10 +134,14 @@ function vytvor() {
   win.once('ready-to-show', () => win.showInactive());
   // test na GitHube: vypíš konzolu, po 60 s urob snímku a skonči
   if (process.env.POSTAVA_TEST) {
-    win.webContents.on('console-message', (e, lvl, msg) => console.log('[postava]', msg));
-    win.webContents.on('render-process-gone', (e, d) => console.log('[postava] pád', JSON.stringify(d)));
+    const zapis = (t) => { try { fs.appendFileSync(process.env.POSTAVA_TEST + '.log', t + '\n'); } catch {} };
+    win.webContents.on('console-message', (e, lvl, msg, line, src) => zapis(`[konzola ${lvl}] ${msg} (${src}:${line})`));
+    win.webContents.on('render-process-gone', (e, d) => zapis('[pád] ' + JSON.stringify(d)));
+    win.webContents.on('did-fail-load', (e, k, d, u) => zapis(`[nenačítané] ${k} ${d} ${u}`));
+    win.webContents.on('did-finish-load', () => zapis('[načítané]'));
+    setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 55000);
     setTimeout(async () => {
-      try { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.POSTAVA_TEST, img.toPNG()); console.log('[postava] snímka uložená'); }
+      try { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.POSTAVA_TEST, img.toPNG()); }
       catch (e) { console.log('[postava] snímka zlyhala', e); }
       app.exit(0);
     }, 60000);

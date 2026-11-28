@@ -34,7 +34,8 @@ jobs:
           if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
           Get-Content out.txt -ErrorAction SilentlyContinue | Select-String "postava" | Select-Object -First 60
           Get-Content err.txt -ErrorAction SilentlyContinue | Select-Object -Last 30
-          if (Test-Path postava.png) { "SNIMKA OK $((Get-Item postava.png).Length)" } else { "SNIMKA CHYBA" }
+          Get-Content postava.png.log -ErrorAction SilentlyContinue
+          if (Test-Path postava.png) { "SNIMKA OK $((Get-Item postava.png).Length)"; "PNGB64:" + [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\postava.png")) } else { "SNIMKA CHYBA" }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
