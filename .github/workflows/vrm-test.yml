@@ -1,0 +1,20 @@
+name: dočasné – VRM
+on:
+  push:
+    branches: [postava]
+    paths: ['.github/workflows/vrm-test.yml']
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          set +e
+          for f in avatarsample_d avatarsample_e avatarsample_f avatarsample_g sendagaya_shino; do
+            curl -sL -o $f.zip -w "$f %{http_code} %{size_download}\n" "https://opengameart.org/sites/default/files/$f.zip"
+            unzip -l $f.zip | grep -i "vrm\|png\|txt" | head -5
+          done
+          curl -s "https://registry.npmjs.org/@pixiv/three-vrm/latest" | jq -r '.version, .peerDependencies'
+          curl -s "https://registry.npmjs.org/three/latest" | jq -r .version
+          curl -s "https://registry.npmjs.org/node-llama-cpp/latest" | jq -r '.version'
+          curl -sIL -o /dev/null -w "%{http_code}\n" https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf
