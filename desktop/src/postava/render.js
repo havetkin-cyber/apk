@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
 const P = window.postava;
 window.__postavaBezi = true;
@@ -45,6 +46,33 @@ let f = 1, zaklad = 0;     // f = -1 keď je model otočený dozadu (−Z): osi 
 // ---------------- načítanie VRM ----------------
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
+const loaderAnim = new GLTFLoader();
+loaderAnim.register((parser) => new VRMAnimationLoaderPlugin(parser));
+
+// ---------------- tance z VRMA súborov (priečinok Tance) ----------------
+let mixer = null, akciaTanca = null, tanecDo = 0, menoTanca = '';
+const animacie = new Map();   // url → VRMAnimation
+async function zacniVrmaTanec() {
+  const zoznam = await P.tance().catch(() => []);
+  if (!zoznam.length || !vrm) return false;
+  const t = zoznam[Math.floor(Math.random() * zoznam.length)];
+  try {
+    if (!animacie.has(t.url)) { const g = await loaderAnim.loadAsync(t.url); animacie.set(t.url, g.userData.vrmAnimations?.[0]); }
+    const va = animacie.get(t.url); if (!va) return false;
+    const clip = createVRMAnimationClip(va, vrm);
+    if (!mixer || mixer.getRoot() !== vrm.scene) mixer = new THREE.AnimationMixer(vrm.scene);
+    const nova = mixer.clipAction(clip);
+    nova.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.4).play();
+    if (akciaTanca && akciaTanca !== nova) akciaTanca.fadeOut(0.4);
+    akciaTanca = nova; menoTanca = t.meno;
+    tanecDo = performance.now() + 20000;
+    return true;
+  } catch (e) { console.error('tanec', t.meno, e); return false; }
+}
+function zastavVrmaTanec() {
+  if (mixer) mixer.stopAllAction();
+  akciaTanca = null;
+}
 
 async function nacitaj(url) {
   const gltf = await loader.loadAsync(url);
@@ -209,6 +237,8 @@ async function otvorMenu(x, y) {
   });
   nad('Tanec');
   tl(i.tanec ? '💃 Tancuje pri hudbe' : '🪑 Pri hudbe netancuje', async () => { tanecPovoleny = await P.tanecPrepni(); povedz(tanecPovoleny ? 'Pusti nejakú pesničku!' : 'Dobre, budem len sedieť.', tanecPovoleny ? 'excited' : 'relaxed'); });
+  tl('➕ Pridať tanec (.vrma)…', async () => { const n = await P.tanecPridaj(); if (n) povedz(n > 1 ? `Naučila som sa ${n} nové tance!` : 'Nový tanec! Pusti hudbu!', 'excited'); });
+  tl('📁 Priečinok s tancami', () => P.tancePriecinok());
   nad('Hlas (Kasandra)');
   tl(i.hlas ? '🔊 Hlas zapnutý' : '🔇 Hlas vypnutý', async () => { const z = await P.hlasPrepni(); povedz(z ? 'Tak, zase hovorím.' : 'Dobre, budem ticho… hmpf.', z ? 'happy' : 'sad'); });
   nad('');
@@ -263,8 +293,8 @@ async function spustiUcho() {
       if (hra) { tichoOd = 0; if (!hudbaOd) hudbaOd = teraz; } else { hudbaOd = 0; if (!tichoOd) tichoOd = teraz; }
       const ma = tanecPovoleny && hudbaOd && teraz - hudbaOd > 2.5;
       const prestan = tichoOd && teraz - tichoOd > 3;
-      if (ma && !tanci) { tanci = true; P.tanec(true); }
-      if (tanci && (prestan || !tanecPovoleny)) { tanci = false; P.tanec(false); }
+      if (ma && !tanci) { tanci = true; P.tanec(true); zacniVrmaTanec(); }
+      if (tanci && (prestan || !tanecPovoleny)) { tanci = false; P.tanec(false); zastavVrmaTanec(); }
     }, 20);
   } catch (e) { console.error('ucho', e); }
 }
@@ -380,7 +410,17 @@ function slucka() {
   requestAnimationFrame(slucka);
   const dt = Math.min(hodiny.getDelta(), 0.1), t = hodiny.elapsedTime;
   if (vrm) {
-    poza(t);
+    const vrmaTanec = akciaTanca && tanci && (stav === 'sedi' || stav === 'stoji');
+    if (vrmaTanec) {
+      // nahraný tanec: kosti riadi animácia, postava stojí na povrchu a pozerá na nás
+      if (performance.now() > tanecDo) { tanecDo = performance.now() + 20000; zacniVrmaTanec(); }
+      mixer.update(dt);
+      vrm.scene.position.set(0, 0, 0);
+      vrm.scene.rotation.y = zaklad;
+    } else {
+      if (akciaTanca && !tanci) zastavVrmaTanec();
+      poza(t);
+    }
     mimika(t, dt);
     ciel.position.set((kurzor.x - W / 2) / M, hore - kurzor.y / M, 2);
     vrm.update(dt);
@@ -397,4 +437,9 @@ function slucka() {
 slucka();
 
 // štart
-P.info().then((i) => { tanecPovoleny = i.tanec; startModel(i.vybrana === 'vlastna' ? 'vlastna' : i.vybrana); spustiUcho(); });
+P.info().then(async (i) => {
+  tanecPovoleny = i.tanec;
+  await startModel(i.vybrana === 'vlastna' ? 'vlastna' : i.vybrana);
+  if (i.testTanec) { tanci = true; console.log('test tanca: ' + await zacniVrmaTanec()); return; }
+  spustiUcho();
+});
