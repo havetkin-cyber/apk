@@ -10,7 +10,8 @@
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win --publish never",
-    "dist:linux": "electron-builder --linux --publish never"
+    "dist:linux": "electron-builder --linux --publish never",
+    "postinstall": "node scripts/kopiruj-three.js"
   },
   "dependencies": {
     "koffi": "^2.9.0",
