@@ -13,7 +13,11 @@
     "dist:linux": "electron-builder --linux --publish never"
   },
   "dependencies": {
-    "koffi": "^2.9.0"
+    "koffi": "^2.9.0",
+    "three": "^0.181.0",
+    "@pixiv/three-vrm": "^3.4.0",
+    "node-llama-cpp": "^3.14.0",
+    "adm-zip": "^0.5.16"
   },
   "devDependencies": {
     "electron": "^38.0.0",
@@ -29,15 +33,28 @@
     },
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/@node-llama-cpp/*cuda*/**"
     ],
     "asarUnpack": [
-      "node_modules/koffi/**"
+      "node_modules/koffi/**",
+      "node_modules/node-llama-cpp/**",
+      "node_modules/@node-llama-cpp/**"
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png"
     },
@@ -51,8 +68,18 @@
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "category": "Utility",
       "icon": "build/icon.png",

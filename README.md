@@ -28,3 +28,19 @@ Priečinok `desktop/` – Electron appka s rovnakými funkciami:
 - Moja galéria, Galéria 4K z webu, Moje odkazy
 
 V **Releases** nájdeš `AlexiaLiveTapeta-windows-setup.exe`, `AlexiaLiveTapeta-windows-portable.exe`, `.AppImage` a `.deb`.
+
+## 🧝 Postavička na ploche (len PC – Windows)
+V tapete (alebo v lište → *Postavička na ploche*) zapneš 3D postavičku, ktorá žije na tvojej ploche:
+- **sedí na lište** alebo si **sadne na okno**, s ktorým práve pracuješ, nohy jej visia a hompáľajú sa; občas sa prejde
+- **chytíš ju myšou a presunieš** – keď ju pustíš, spadne na lištu alebo na okno (z výšky sa naštve)
+- **pohladkanie** = klik na ňu, **rozhovor** = dvojklik, **menu** = pravé tlačidlo
+- **má náladu**: keď ju 15 minút ignoruješ, urazí sa a otočí sa chrbtom (pohladkaním jej to prejde), keď ju ťaháš, hnevá sa,
+  v noci ťa posiela spať, komentuje, čo robíš (podľa názvu okna), sedá si naschvál na tvoje okno
+- **tancuje na hudbu**: keď v PC hrá pesnička (YouTube, Spotify, hocičo), postaví sa a tancuje do rytmu (zvuk z PC sa len počúva
+  kvôli rytmu, nikam sa neposiela ani neukladá); keď hudba stíchne, prestane – dá sa vypnúť v menu
+- nikdy nezatvára programy, nemaže súbory ani nehýbe kurzorom – zloba je len zábavná
+- **postavy na výber** (3D VRM, CC0 od VRoid Project, stiahnu sa pri výbere): Shino, Sample E, F, G – alebo **vlastný VRM** (napr. z VRoid Hubu)
+- **mozog**: Qwen3 4B Instruct (lokálne, ~2,5 GB, stiahne sa na požiadanie) – beží na **grafike (VRAM)**, keď nejde, na procesore;
+  odpovedá po slovensky a ku každej odpovedi určí **emóciu** (radosť, nadšenie, hnev, krik, smútok, strach, prekvapenie, šepot, pohoda)
+- **hlas**: Piper + **Kasandra** (český ženský hlas s emóciami, CC BY 4.0, autor Ondřej Šimek) – beží na **procesore (RAM)**;
+  podľa emócie sa mení tempo, živosť, výška a hlasitosť; ústa sa hýbu podľa zvuku; tvár podľa emócie

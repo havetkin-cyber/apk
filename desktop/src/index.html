@@ -46,6 +46,7 @@
   <label><input type="checkbox" id="mute"> Bez zvuku</label>
   <label><input type="checkbox" id="fill"> Vyplniť obrazovku</label>
   <label><input type="checkbox" id="autostart"> Spustiť so systémom</label>
+  <label id="postavaRiadok" style="display:none"><input type="checkbox" id="postava"> Postavička na ploche</label>
   <button id="pause">⏸ Pozastaviť</button>
 </header>
 
@@ -105,6 +106,7 @@ async function refresh() {
   $('mute').checked = state.config.mute;
   $('fill').checked = state.config.fill;
   $('autostart').checked = state.config.autostart;
+  if (state.platform === 'win32') { $('postavaRiadok').style.display = ''; $('postava').checked = !!state.postava; }
   $('pause').textContent = state.media.paused ? '▶ Spustiť' : '⏸ Pozastaviť';
   showAppUpdate(state.appUpdate);
   render();
@@ -237,6 +239,7 @@ $('pick').onclick = async () => { if (await api.pickFile()) { tab = 'mine'; setT
 $('mute').onchange = (e) => api.setOption('mute', e.target.checked);
 $('fill').onchange = (e) => api.setOption('fill', e.target.checked);
 $('autostart').onchange = (e) => api.setOption('autostart', e.target.checked);
+$('postava').onchange = (e) => api.setOption('postava', e.target.checked);
 $('pause').onclick = () => api.setPaused(!state.media.paused).then(refresh);
 $('folder').onclick = () => api.openFolder();
 $('update').onclick = async () => {

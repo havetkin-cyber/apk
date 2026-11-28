@@ -5,6 +5,8 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const ytdlp = require('./ytdlp');
+// postavička na ploche – len Windows
+const postava = process.platform === 'win32' ? require('./postava/main') : null;
 
 const IS_WIN = process.platform === 'win32';
 const IS_LINUX = process.platform === 'linux';
@@ -204,6 +206,10 @@ function updateTrayMenu() {
       label: paused ? '▶ Spustiť tapetu' : '⏸ Pozastaviť tapetu',
       click: () => { paused = !paused; broadcastMedia(); },
     },
+    ...(postava ? [{
+      label: postava.zapnuta() ? '🙈 Schovať postavičku' : '🧝 Postavička na ploche',
+      click: () => { postava.zapnuta() ? postava.vypni() : postava.zapni(); setTimeout(updateTrayMenu, 300); },
+    }] : []),
     { type: 'separator' },
     { label: 'Ukončiť', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -379,6 +385,7 @@ function registerIpc() {
     config,
     media: mediaState(),
     platform: process.platform,
+    postava: !!(postava && postava.zapnuta()),
     appUpdate: availableUpdate,
   }));
 
@@ -432,6 +439,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('set-option', (_e, key, value) => {
+    if (key === 'postava' && postava) { value ? postava.zapni() : postava.vypni(); setTimeout(updateTrayMenu, 300); return; }
     if (!['mute', 'fill', 'autostart'].includes(key)) return;
     config[key] = !!value;
     saveConfig();
@@ -464,6 +472,7 @@ app.whenReady().then(() => {
   createTray();
   createWallpaperWindows();
   createControlWindow(!process.argv.includes('--hidden'));
+  if (postava) { postava.init(config, saveConfig, updateTrayMenu); updateTrayMenu(); }
 
   let rebuild = null;
   const rebuildLater = () => {
