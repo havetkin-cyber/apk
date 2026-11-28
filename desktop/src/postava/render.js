@@ -21,7 +21,10 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const sirka = W / M;
 const camera = new THREE.OrthographicCamera(-sirka / 2, sirka / 2, hore, -dole, 0.1, 20);
-camera.position.set(0, 0, 5);
+// kamera mierne zhora (nie spod sukne)
+const SKLON = 18 * Math.PI / 180;
+camera.position.set(0, Math.sin(SKLON) * 5, Math.cos(SKLON) * 5);
+camera.lookAt(0, 0, 0);
 scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 const svetlo = new THREE.DirectionalLight(0xffffff, 1.6);
 svetlo.position.set(1, 2, 3);
@@ -307,13 +310,13 @@ function poza(t) {
     }
   } else if (stav === 'sedi' || stav === 'stoji') {
     // sedí na okraji, nohy visia a hompáľajú sa
-    rot('leftUpperLeg', -1.5, 0.05, 0.08);
-    rot('rightUpperLeg', -1.5, -0.05, -0.08);
+    rot('leftUpperLeg', -1.5, 0, -0.04);      // kolená k sebe
+    rot('rightUpperLeg', -1.5, 0, 0.04);
     rot('leftLowerLeg', 1.35 + s(t * 2.1) * 0.22, 0, 0);
     rot('rightLowerLeg', 1.35 + s(t * 2.1 + 2.2) * 0.22, 0, 0);
-    // ruky opreté vedľa seba
-    rot('leftUpperArm', 0.35, 0, -1.25); rot('rightUpperArm', 0.35, 0, 1.25);
-    rot('leftLowerArm', 0, -0.3, 0); rot('rightLowerArm', 0, 0.3, 0);
+    // ruky v lone
+    rot('leftUpperArm', -0.35, 0, -1.2); rot('rightUpperArm', -0.35, 0, 1.2);
+    rot('leftLowerArm', 0, -1.1, 0); rot('rightLowerArm', 0, 1.1, 0);
     if (urazena) { rot('leftUpperArm', 0.9, 0.6, -1.0); rot('rightUpperArm', 0.9, -0.6, 1.0); rot('leftLowerArm', 0, -1.9, 0); rot('rightLowerArm', 0, 1.9, 0); } // ruky prekrížené
     if (nalada < -40 && !urazena) rot('head', -0.05, 0, s(t * 0.7) * 0.05);
   } else if (stav === 'chodi') {
