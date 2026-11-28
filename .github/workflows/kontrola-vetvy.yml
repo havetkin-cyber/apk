@@ -1,0 +1,26 @@
+name: Kontrola vetvy (bez vydania)
+on:
+  push:
+    branches-ignore: [main]
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Moduly pre postavičku
+        shell: bash
+        run: |
+          ls node_modules/three/build/three.module.js node_modules/three/examples/jsm/loaders/GLTFLoader.js node_modules/@pixiv/three-vrm/lib/three-vrm.module.js
+          ls node_modules/@node-llama-cpp/ || true
+          node --check src/main.js && node --check src/postava/main.js && node --check src/postava/render.js
+      - name: Zostavenie (bez inštalátora)
+        run: npx electron-builder --win --dir --publish never
+      - shell: bash
+        run: du -sh dist/win-unpacked; ls dist/win-unpacked/resources; ls dist/win-unpacked/resources/app.asar.unpacked/node_modules

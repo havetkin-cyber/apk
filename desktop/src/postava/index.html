@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; script-src 'self' file:; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'self' file: data: blob:">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; user-select: none; }
+  canvas { position: absolute; inset: 0; }
+  #bublina { position: absolute; left: 50%; transform: translateX(-50%); max-width: 300px; padding: 8px 12px; border-radius: 14px;
+    background: rgba(25, 22, 38, .92); color: #fff; font-size: 14px; line-height: 1.35; box-shadow: 0 4px 16px rgba(0,0,0,.35);
+    border: 1px solid rgba(190, 120, 255, .55); opacity: 0; transition: opacity .25s; pointer-events: none; text-align: center; }
+  #bublina.vidno { opacity: 1; }
+  #pole { position: absolute; left: 20px; right: 20px; bottom: 12px; display: none; gap: 6px; }
+  #pole.vidno { display: flex; }
+  #pole input { flex: 1; padding: 8px 12px; border-radius: 16px; border: 1px solid rgba(190,120,255,.7); background: rgba(25,22,38,.95); color: #fff; outline: none; font-size: 14px; }
+  #pole button, .menu button { border: 0; border-radius: 14px; background: linear-gradient(90deg,#7a4dff,#ff5fb5); color: #fff; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .menu { position: absolute; display: none; flex-direction: column; gap: 4px; padding: 8px; border-radius: 14px; background: rgba(25,22,38,.96);
+    border: 1px solid rgba(190,120,255,.55); min-width: 180px; }
+  .menu.vidno { display: flex; }
+  .menu button { background: rgba(255,255,255,.06); text-align: left; }
+  .menu button:hover { background: rgba(190,120,255,.35); }
+  .menu .nadpis { color: #bfb5d8; font-size: 11px; margin: 4px 2px 0; }
+  #priebeh { position: absolute; left: 30px; right: 30px; top: 45%; color: #fff; font-size: 13px; text-align: center; display: none;
+    background: rgba(25,22,38,.9); padding: 10px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<div id="bublina"></div>
+<div id="priebeh"></div>
+<div id="pole"><input id="vstup" placeholder="Napíš jej niečo… (Esc = zavrieť)" maxlength="500"><button id="posli">➤</button></div>
+<div id="menu" class="menu"></div>
+<script type="importmap">
+{ "imports": {
+  "three": "../../node_modules/three/build/three.module.js",
+  "three/addons/": "../../node_modules/three/examples/jsm/",
+  "@pixiv/three-vrm": "../../node_modules/@pixiv/three-vrm/lib/three-vrm.module.js"
+} }
+</script>
+<script type="module" src="render.js"></script>
+</body>
+</html>
