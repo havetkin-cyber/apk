@@ -132,6 +132,16 @@ function vytvor() {
   });
   win.loadFile(path.join(__dirname, 'index.html'));
   win.once('ready-to-show', () => win.showInactive());
+  // test na GitHube: vypíš konzolu, po 60 s urob snímku a skonči
+  if (process.env.POSTAVA_TEST) {
+    win.webContents.on('console-message', (e, lvl, msg) => console.log('[postava]', msg));
+    win.webContents.on('render-process-gone', (e, d) => console.log('[postava] pád', JSON.stringify(d)));
+    setTimeout(async () => {
+      try { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.POSTAVA_TEST, img.toPNG()); console.log('[postava] snímka uložená'); }
+      catch (e) { console.log('[postava] snímka zlyhala', e); }
+      app.exit(0);
+    }, 60000);
+  }
   win.on('closed', () => { win = null; zastavCasovace(); });
   stav = 'sedi'; naOkne = null;
   spustiSlucku();

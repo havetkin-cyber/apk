@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const P = window.postava;
+window.__postavaBezi = true;
 const W = innerWidth, H = innerHeight;
 const PLOCHA = Math.round(H * 0.62);        // riadok povrchu (rovnako ako v main.js)
 const VYSKA_SVETA = 2.8;                     // m na výšku okna
