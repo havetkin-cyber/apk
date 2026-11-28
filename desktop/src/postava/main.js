@@ -1,7 +1,7 @@
 // Postavička na ploche (len Windows): 3D VRM postava, sedí na lište alebo na okne, dá sa ťahať,
 // rozpráva sa (lokálny jazykový model cez node-llama-cpp) a má vlastnú náladu – urazí sa, hnevá, robí naschvál.
 // Nikdy nezatvára programy, nemaže súbory, nehýbe kurzorom.
-const { BrowserWindow, screen, ipcMain, app, dialog, net } = require('electron');
+const { BrowserWindow, screen, ipcMain, app, dialog, net, desktopCapturer } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -60,6 +60,7 @@ let slucka = null;
 let mozog = null;        // { session } alebo null
 let mozogSa = null;      // Promise pri načítavaní
 let pocetTahani = 0;
+let tanci = false;        // práve tancuje na hudbu z PC
 
 const dir = () => { const d = path.join(app.getPath('userData'), 'postava'); fs.mkdirSync(d, { recursive: true }); return d; };
 const posli = (k, d) => { if (win && !win.isDestroyed()) win.webContents.send(k, d); };
@@ -125,6 +126,10 @@ function vytvor() {
   });
   win.setAlwaysOnTop(true, 'floating');
   win.setIgnoreMouseEvents(true, { forward: true });
+  // zvuk z PC (loopback) – len na zistenie rytmu hudby, nikam sa neposiela ani neukladá
+  win.webContents.session.setDisplayMediaRequestHandler((req, cb) => {
+    desktopCapturer.getSources({ types: ['screen'] }).then((z) => cb({ video: z[0], audio: 'loopback' })).catch(() => cb({}));
+  });
   win.loadFile(path.join(__dirname, 'index.html'));
   win.once('ready-to-show', () => win.showInactive());
   win.on('closed', () => { win = null; zastavCasovace(); });
@@ -252,6 +257,7 @@ function spustiSlucku() {
   let dalsia = 25;
   slucka = setInterval(() => {
     if (!win || stav === 'tahana' || stav === 'pada') return;
+    if (tanci) { ignorovana = 0; return; }   // pri hudbe sa nenudí ani neuráža
     ignorovana++;
     // ak okno, na ktorom sedí, zmizlo alebo sa pohlo → spadne
     if (naOkne) {
@@ -461,7 +467,7 @@ function registruj() {
     postavy: POSTAVY.map((p) => ({ id: p.id, nazov: p.nazov, mam: fs.existsSync(cestaPostavy(p.id)) })),
     vybrana: cfg.postavaId || 'shino', vlastna: !!cfg.postavaVlastna, mozog: !!mozog, mozogMb: MODEL.mb,
     mozogStiahnuty: fs.existsSync(path.join(dir(), MODEL.subor)), stav, nalada, urazena,
-    hlas: cfg.postavaHlas !== false, mamHlas: mamHlas(),
+    hlas: cfg.postavaHlas !== false, mamHlas: mamHlas(), tanec: cfg.postavaTanec !== false,
   }));
   ipcMain.handle('postava-model', async (e, id) => {
     const c = await pripravPostavu(id || cfg.postavaId || 'shino', (p) => posli('postava-priebeh', { co: 'postava', p }));
@@ -491,6 +497,14 @@ function registruj() {
     return true;
   });
   ipcMain.on('postava-skry', () => vypni());
+  ipcMain.on('postava-tanec', (e, t) => {
+    if (t === tanci) return;
+    tanci = t;
+    if (t) { clearInterval(chodza); chodza = null; if (stav === 'chodi') nastavStav('sedi'); if (urazena) { urazena = false; posli('postava-stav', { stav, urazena, nalada }); } zmenNaladu(+10);
+      povedz(nahodne(['Jéj, hudba! Idem tancovať!', 'Táto pesnička je super!', 'Pozri, ako to viem!', 'Hudbááá!']), 'excited'); }
+    else if (Math.random() < 0.5) povedz(nahodne(['Uf, to bolo super.', 'Ešte jednu!', 'Hmm, už skončila?']), 'happy');
+  });
+  ipcMain.handle('postava-tanec-prepni', () => { cfg.postavaTanec = cfg.postavaTanec === false; ulozCfg(); return cfg.postavaTanec !== false; });
   ipcMain.handle('postava-hovor', async (e, text, emocia) => { try { return await hovor(String(text).slice(0, 400), emocia); } catch (err) { console.error('postava hlas', err); return null; } });
   ipcMain.handle('postava-hlas-prepni', () => { cfg.postavaHlas = cfg.postavaHlas === false; ulozCfg(); return cfg.postavaHlas !== false; });
   ipcMain.handle('postava-kurzor', () => {

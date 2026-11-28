@@ -36,6 +36,8 @@ V tapete (alebo v lište → *Postavička na ploche*) zapneš 3D postavičku, kt
 - **pohladkanie** = klik na ňu, **rozhovor** = dvojklik, **menu** = pravé tlačidlo
 - **má náladu**: keď ju 15 minút ignoruješ, urazí sa a otočí sa chrbtom (pohladkaním jej to prejde), keď ju ťaháš, hnevá sa,
   v noci ťa posiela spať, komentuje, čo robíš (podľa názvu okna), sedá si naschvál na tvoje okno
+- **tancuje na hudbu**: keď v PC hrá pesnička (YouTube, Spotify, hocičo), postaví sa a tancuje do rytmu (zvuk z PC sa len počúva
+  kvôli rytmu, nikam sa neposiela ani neukladá); keď hudba stíchne, prestane – dá sa vypnúť v menu
 - nikdy nezatvára programy, nemaže súbory ani nehýbe kurzorom – zloba je len zábavná
 - **postavy na výber** (3D VRM, CC0 od VRoid Project, stiahnu sa pri výbere): Shino, Sample E, F, G – alebo **vlastný VRM** (napr. z VRoid Hubu)
 - **mozog**: Qwen3 4B Instruct (lokálne, ~2,5 GB, stiahne sa na požiadanie) – beží na **grafike (VRAM)**, keď nejde, na procesore;

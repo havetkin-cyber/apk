@@ -197,6 +197,8 @@ async function otvorMenu(x, y) {
     povedz('Chvíľu strpenie, zapínam si mozog…', 'neutral');
     try { await P.mozog(); povedz('Tak, už rozmýšľam. Čo chceš?', 'happy'); } catch (e) { povedz('Mozog sa nepodarilo zapnúť: ' + e.message, 'sad'); }
   });
+  nad('Tanec');
+  tl(i.tanec ? '💃 Tancuje pri hudbe' : '🪑 Pri hudbe netancuje', async () => { tanecPovoleny = await P.tanecPrepni(); povedz(tanecPovoleny ? 'Pusti nejakú pesničku!' : 'Dobre, budem len sedieť.', tanecPovoleny ? 'excited' : 'relaxed'); });
   nad('Hlas (Kasandra)');
   tl(i.hlas ? '🔊 Hlas zapnutý' : '🔇 Hlas vypnutý', async () => { const z = await P.hlasPrepni(); povedz(z ? 'Tak, zase hovorím.' : 'Dobre, budem ticho… hmpf.', z ? 'happy' : 'sad'); });
   nad('');
@@ -205,6 +207,49 @@ async function otvorMenu(x, y) {
   menu.style.left = Math.min(x, W - 200) + 'px';
   menu.style.top = Math.max(8, Math.min(y, H - menu.offsetHeight - 8)) + 'px';
   P.mys(true);
+}
+
+// ---------------- tanec: počúva zvuk z PC a hľadá rytmus ----------------
+let tanci = false, uderOd = 0, interval = 0.5, uderov = 0, tanecPovoleny = true;
+let hudbaOd = 0, tichoOd = 0;
+async function spustiUcho() {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: { width: 1, height: 1, frameRate: 1 } });
+    stream.getVideoTracks().forEach((t) => t.stop());
+    if (!stream.getAudioTracks().length) return;
+    const ctx = new AudioContext();
+    const src = ctx.createMediaStreamSource(stream);
+    const an = ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.2;
+    src.connect(an);                      // nie do reproduktorov – len počúvame
+    const f = new Uint8Array(an.frequencyBinCount);
+    const hz = ctx.sampleRate / an.fftSize;
+    const basOd = Math.floor(40 / hz), basDo = Math.ceil(160 / hz);
+    let priemer = 0, posledny = 0, celk = 0;
+    const intervaly = [];
+    setInterval(() => {
+      an.getByteFrequencyData(f);
+      let b = 0; for (let i = basOd; i <= basDo; i++) b += f[i]; b /= (basDo - basOd + 1);
+      let c = 0; for (let i = 0; i < f.length; i++) c += f[i]; c /= f.length;
+      celk = celk * 0.95 + c * 0.05;
+      priemer = priemer * 0.92 + b * 0.08;
+      const teraz = performance.now() / 1000;
+      // úder: basy výrazne nad priemerom
+      if (b > priemer * 1.35 && b > 90 && teraz - posledny > 0.28) {
+        const d = teraz - posledny; posledny = teraz;
+        if (d > 0.28 && d < 1.2) { intervaly.push(d); if (intervaly.length > 12) intervaly.shift(); }
+        const zor = [...intervaly].sort((x, y) => x - y);
+        if (zor.length >= 4) interval = zor[Math.floor(zor.length / 2)];
+        uderOd = teraz; uderov++;
+      }
+      // hudba hrá, keď je zvuk stály a má údery; vlastný hlas postavičky sa nepočíta
+      const hra = celk > 18 && teraz - posledny < 2.5 && !analyzer;
+      if (hra) { tichoOd = 0; if (!hudbaOd) hudbaOd = teraz; } else { hudbaOd = 0; if (!tichoOd) tichoOd = teraz; }
+      const ma = tanecPovoleny && hudbaOd && teraz - hudbaOd > 2.5;
+      const prestan = tichoOd && teraz - tichoOd > 3;
+      if (ma && !tanci) { tanci = true; P.tanec(true); }
+      if (tanci && (prestan || !tanecPovoleny)) { tanci = false; P.tanec(false); }
+    }, 20);
+  } catch (e) { console.error('ucho', e); }
 }
 
 // ---------------- pózy ----------------
@@ -220,7 +265,33 @@ function poza(t) {
   rot('spine', dych, 0, 0);
   rot('chest', dych, 0, 0);
 
-  if (stav === 'sedi' || stav === 'stoji') {
+  const moznoTancit = tanci && (stav === 'sedi' || stav === 'stoji');
+  if (moznoTancit) {
+    // tanec do rytmu: fáza 0..1 medzi údermi, každých 8 úderov iný pohyb
+    const teraz = performance.now() / 1000;
+    const faza = Math.min(1, (teraz - uderOd) / Math.max(0.3, interval));
+    const u = uderov % 2 ? 1 : -1;
+    const pohyb = Math.floor(uderov / 8) % 4;
+    const odraz = Math.sin(faza * Math.PI);           // 0→1→0 medzi údermi
+    rot('hips', 0, u * 0.15 * odraz, u * 0.08 * odraz);
+    rot('spine', 0.05 * odraz, 0, -u * 0.06 * odraz);
+    rot('head', -0.12 * odraz, u * 0.1, u * 0.08 * odraz);
+    rot('leftUpperLeg', -0.25 * (u > 0 ? odraz : 0), 0, 0.05); rot('rightUpperLeg', -0.25 * (u < 0 ? odraz : 0), 0, -0.05);
+    rot('leftLowerLeg', 0.5 * (u > 0 ? odraz : 0), 0, 0); rot('rightLowerLeg', 0.5 * (u < 0 ? odraz : 0), 0, 0);
+    if (pohyb === 0) { // ruky hore, striedavo
+      rot('leftUpperArm', 0, 0, u > 0 ? 2.4 : 1.2); rot('rightUpperArm', 0, 0, u < 0 ? -2.4 : -1.2);
+      rot('leftLowerArm', 0, 0, 0.4); rot('rightLowerArm', 0, 0, -0.4);
+    } else if (pohyb === 1) { // ruky v bok, vlní sa
+      rot('leftUpperArm', 0.3, 0, -0.9); rot('rightUpperArm', 0.3, 0, 0.9); rot('leftLowerArm', 0, -1.6, 0); rot('rightLowerArm', 0, 1.6, 0);
+      rot('hips', 0, 0, u * 0.18 * odraz);
+    } else if (pohyb === 2) { // tlieskanie nad hlavou
+      const k = odraz * 0.35;
+      rot('leftUpperArm', -0.3, 0, 2.3 - k); rot('rightUpperArm', -0.3, 0, -2.3 + k); rot('leftLowerArm', 0, -0.8, 0); rot('rightLowerArm', 0, 0.8, 0);
+    } else { // pumpovanie päsťou
+      rot('leftUpperArm', -0.6 - odraz * 0.6, 0, -1.0); rot('rightUpperArm', 0.2, 0, 1.1);
+      rot('leftLowerArm', 0, -1.4 + odraz * 0.6, 0);
+    }
+  } else if (stav === 'sedi' || stav === 'stoji') {
     // sedí na okraji, nohy visia a hompáľajú sa
     rot('leftUpperLeg', -1.5, 0.05, 0.08);
     rot('rightUpperLeg', -1.5, -0.05, -0.08);
@@ -253,13 +324,15 @@ function poza(t) {
   } else akcia = null;
 
   // telo: chrbtom keď je urazená, bokom pri chôdzi
-  let cielOtocenia = urazena ? Math.PI : stav === 'chodi' ? smer * Math.PI / 2 : 0;
+  let cielOtocenia = urazena && !tanci ? Math.PI : stav === 'chodi' ? smer * Math.PI / 2 : 0;
+  if (moznoTancit && Math.floor(uderov / 8) % 4 === 1) cielOtocenia = Math.sin(performance.now() / 1000 * Math.PI / Math.max(0.3, interval) / 4) * 0.5;
   otocenie += (cielOtocenia - otocenie) * 0.08;
   vrm.scene.rotation.y = otocenie;
 
   // výška: sedí boky na povrchu, inak nohy na povrchu
-  const sedi = stav === 'sedi' || stav === 'stoji';
+  const sedi = (stav === 'sedi' || stav === 'stoji') && !moznoTancit;
   vrm.scene.position.y = sedi ? -vyskaBokov + 0.06 : 0;
+  if (moznoTancit) vrm.scene.position.y = -Math.abs(Math.sin(Math.min(1, (performance.now() / 1000 - uderOd) / Math.max(0.3, interval)) * Math.PI)) * 0.04;
   vrm.scene.position.z = 0;
 }
 
@@ -269,6 +342,7 @@ function mimika(t, dt) {
   for (const e of ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'aa', 'blink']) em.setValue(e, 0);
   let e = performance.now() < emociaDo ? emocia : (urazena ? 'sad' : nalada < -40 ? 'angry' : nalada > 50 ? 'happy' : 'relaxed');
   if (stav === 'tahana' || stav === 'pada') e = nalada < -20 ? 'angry' : 'surprised';
+  else if (tanci && performance.now() >= emociaDo) e = 'happy';
   if (e !== 'neutral') em.setValue(e, e === 'relaxed' ? 0.5 : 0.85);
   // ústa pri reči
   hlasitost += (hlasitostZvuku() - hlasitost) * 0.5;
@@ -306,4 +380,4 @@ function slucka() {
 slucka();
 
 // štart
-P.info().then((i) => startModel(i.vybrana === 'vlastna' ? 'vlastna' : i.vybrana));
+P.info().then((i) => { tanecPovoleny = i.tanec; startModel(i.vybrana === 'vlastna' ? 'vlastna' : i.vybrana); spustiUcho(); });
