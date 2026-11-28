@@ -18,7 +18,8 @@
     "three": "^0.181.0",
     "@pixiv/three-vrm": "^3.4.0",
     "node-llama-cpp": "^3.14.0",
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "@pixiv/three-vrm-animation": "^3.4.0"
   },
   "devDependencies": {
     "electron": "^38.0.0",

@@ -17,7 +17,7 @@ jobs:
       - name: Moduly pre postavičku
         shell: bash
         run: |
-          ls node_modules/three/build/three.module.js node_modules/three/examples/jsm/loaders/GLTFLoader.js node_modules/@pixiv/three-vrm/lib/three-vrm.module.js
+          ls node_modules/three/build/three.module.js node_modules/three/examples/jsm/loaders/GLTFLoader.js node_modules/@pixiv/three-vrm/lib/three-vrm.module.js node_modules/@pixiv/three-vrm-animation/lib/three-vrm-animation.module.js
           ls node_modules/@node-llama-cpp/ || true
           node --check src/main.js && node --check src/postava/main.js && node --check src/postava/render.js
       - name: Zostavenie (bez inštalátora)
@@ -28,6 +28,8 @@ jobs:
         shell: pwsh
         run: |
           $env:POSTAVA_TEST = "$PWD\postava.png"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm-animation/examples/models/test.vrma" -OutFile "$PWD\test.vrma"
+          $env:POSTAVA_TEST_TANEC = "$PWD\test.vrma"
           $exe = Get-ChildItem dist/win-unpacked -Filter *.exe | Where-Object { $_.Name -notmatch 'Uninstall' } | Select-Object -First 1
           $p = Start-Process -FilePath $exe.FullName -PassThru -RedirectStandardOutput out.txt -RedirectStandardError err.txt
           Start-Sleep -Seconds 160

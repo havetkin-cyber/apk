@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('postava', {
   hlasPrepni: () => ipcRenderer.invoke('postava-hlas-prepni'),
   tanec: (t) => ipcRenderer.send('postava-tanec', t),
   tanecPrepni: () => ipcRenderer.invoke('postava-tanec-prepni'),
+  tance: () => ipcRenderer.invoke('postava-tance'),
+  tanecPridaj: () => ipcRenderer.invoke('postava-tanec-pridaj'),
+  tancePriecinok: () => ipcRenderer.send('postava-tance-priecinok'),
   on: (k, cb) => {
     if (['postava-povedz', 'postava-stav', 'postava-smer', 'postava-akcia', 'postava-priebeh'].includes(k)) ipcRenderer.on(k, (_e, d) => cb(d));
   },

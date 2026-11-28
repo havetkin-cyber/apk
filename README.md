@@ -38,6 +38,8 @@ V tapete (alebo v lište → *Postavička na ploche*) zapneš 3D postavičku, kt
   v noci ťa posiela spať, komentuje, čo robíš (podľa názvu okna), sedá si naschvál na tvoje okno
 - **tancuje na hudbu**: keď v PC hrá pesnička (YouTube, Spotify, hocičo), postaví sa a tancuje do rytmu (zvuk z PC sa len počúva
   kvôli rytmu, nikam sa neposiela ani neukladá); keď hudba stíchne, prestane – dá sa vypnúť v menu
+- **skutočné tance (VRMA)**: v menu *Pridať tanec (.vrma)…* alebo *Priečinok s tancami* – pri hudbe si vyberie náhodný tanec
+  a každých ~20 s ho vymení; bez tancov tancuje vlastnými pohybmi. Tance (VRM Animation) nájdeš napr. na BOOTH (booth.pm, hľadaj „VRMA“)
 - nikdy nezatvára programy, nemaže súbory ani nehýbe kurzorom – zloba je len zábavná
 - **postavy na výber** (3D VRM, CC0 od VRoid Project, stiahnu sa pri výbere): Shino, Sample E, F, G – alebo **vlastný VRM** (napr. z VRoid Hubu)
 - **mozog**: Qwen3 4B Instruct (lokálne, ~2,5 GB, stiahne sa na požiadanie) – beží na **grafike (VRAM)**, keď nejde, na procesore;

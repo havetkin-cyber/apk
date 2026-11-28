@@ -1,7 +1,7 @@
 // Postavička na ploche (len Windows): 3D VRM postava, sedí na lište alebo na okne, dá sa ťahať,
 // rozpráva sa (lokálny jazykový model cez node-llama-cpp) a má vlastnú náladu – urazí sa, hnevá, robí naschvál.
 // Nikdy nezatvára programy, nemaže súbory, nehýbe kurzorom.
-const { BrowserWindow, screen, ipcMain, app, dialog, net, desktopCapturer } = require('electron');
+const { BrowserWindow, screen, ipcMain, app, dialog, net, desktopCapturer, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -143,7 +143,6 @@ function vytvor() {
         import('three').then(() => 'three ok', (e) => 'three: ' + e.message),
         import('@pixiv/three-vrm').then(() => 'vrm ok', (e) => 'vrm: ' + e.message),
         import('three/addons/loaders/GLTFLoader.js').then(() => 'gltf ok', (e) => 'gltf: ' + e.message),
-        import('./render.js?x=1').then(() => 'render ok', (e) => 'render: ' + e.message),
       ]).then((r) => r.join(' | '))`).then((r) => zapis('[importy] ' + r)).catch((e) => zapis('[importy chyba] ' + e)), 20000);
     setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 135000);
     setTimeout(async () => {
@@ -487,7 +486,7 @@ function registruj() {
     postavy: POSTAVY.map((p) => ({ id: p.id, nazov: p.nazov, mam: fs.existsSync(cestaPostavy(p.id)) })),
     vybrana: cfg.postavaId || 'shino', vlastna: !!cfg.postavaVlastna, mozog: !!mozog, mozogMb: MODEL.mb,
     mozogStiahnuty: fs.existsSync(path.join(dir(), MODEL.subor)), stav, nalada, urazena,
-    hlas: cfg.postavaHlas !== false, mamHlas: mamHlas(), tanec: cfg.postavaTanec !== false,
+    hlas: cfg.postavaHlas !== false, mamHlas: mamHlas(), tanec: cfg.postavaTanec !== false, testTanec: !!process.env.POSTAVA_TEST_TANEC,
   }));
   ipcMain.handle('postava-model', async (e, id) => {
     const c = await pripravPostavu(id || cfg.postavaId || 'shino', (p) => posli('postava-priebeh', { co: 'postava', p }));
@@ -524,6 +523,16 @@ function registruj() {
       povedz(nahodne(['Jéj, hudba! Idem tancovať!', 'Táto pesnička je super!', 'Pozri, ako to viem!', 'Hudbááá!']), 'excited'); }
     else if (Math.random() < 0.5) povedz(nahodne(['Uf, to bolo super.', 'Ešte jednu!', 'Hmm, už skončila?']), 'happy');
   });
+  // tance (VRMA) – priečinok Tance
+  const tanceDir = () => { const d = path.join(dir(), 'tance'); fs.mkdirSync(d, { recursive: true }); return d; };
+  ipcMain.handle('postava-tance', () => fs.readdirSync(tanceDir()).filter((f) => f.toLowerCase().endsWith('.vrma')).map((f) => ({ meno: f.replace(/\.vrma$/i, ''), url: pathToFileURL(path.join(tanceDir(), f)).href })));
+  ipcMain.handle('postava-tanec-pridaj', async () => {
+    const r = await dialog.showOpenDialog(win, { title: 'Pridať tanec (VRM animácia)', filters: [{ name: 'VRM animácia', extensions: ['vrma'] }], properties: ['openFile', 'multiSelections'] });
+    if (r.canceled) return 0;
+    for (const f of r.filePaths) fs.copyFileSync(f, path.join(tanceDir(), path.basename(f)));
+    return r.filePaths.length;
+  });
+  ipcMain.on('postava-tance-priecinok', () => shell.openPath(tanceDir()));
   ipcMain.handle('postava-tanec-prepni', () => { cfg.postavaTanec = cfg.postavaTanec === false; ulozCfg(); return cfg.postavaTanec !== false; });
   ipcMain.handle('postava-hovor', async (e, text, emocia) => { try { return await hovor(String(text).slice(0, 400), emocia); } catch (err) { console.error('postava hlas', err); return null; } });
   ipcMain.handle('postava-hlas-prepni', () => { cfg.postavaHlas = cfg.postavaHlas === false; ulozCfg(); return cfg.postavaHlas !== false; });
@@ -541,6 +550,7 @@ const zapnuta = () => !!(win && !win.isDestroyed());
 function init(c, uloz, onZmena) {
   cfg = c; ulozCfg = uloz; zmena = onZmena || (() => {});
   registruj();
+  if (process.env.POSTAVA_TEST_TANEC) { try { const d = path.join(dir(), 'tance'); fs.mkdirSync(d, { recursive: true }); fs.copyFileSync(process.env.POSTAVA_TEST_TANEC, path.join(d, 'test.vrma')); } catch (e) { console.error(e); } }
   if (cfg.postava) vytvor();
 }
 
