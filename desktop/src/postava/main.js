@@ -145,12 +145,12 @@ function vytvor() {
         import('three/addons/loaders/GLTFLoader.js').then(() => 'gltf ok', (e) => 'gltf: ' + e.message),
         import('./render.js?x=1').then(() => 'render ok', (e) => 'render: ' + e.message),
       ]).then((r) => r.join(' | '))`).then((r) => zapis('[importy] ' + r)).catch((e) => zapis('[importy chyba] ' + e)), 20000);
-    setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 55000);
+    setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 135000);
     setTimeout(async () => {
       try { const img = await win.webContents.capturePage(); fs.writeFileSync(process.env.POSTAVA_TEST, img.toPNG()); }
       catch (e) { console.log('[postava] snímka zlyhala', e); }
       app.exit(0);
-    }, 60000);
+    }, 140000);
   }
   win.on('closed', () => { win = null; zastavCasovace(); });
   stav = 'sedi'; naOkne = null;

@@ -30,12 +30,12 @@ jobs:
           $env:POSTAVA_TEST = "$PWD\postava.png"
           $exe = Get-ChildItem dist/win-unpacked -Filter *.exe | Where-Object { $_.Name -notmatch 'Uninstall' } | Select-Object -First 1
           $p = Start-Process -FilePath $exe.FullName -PassThru -RedirectStandardOutput out.txt -RedirectStandardError err.txt
-          Start-Sleep -Seconds 90
+          Start-Sleep -Seconds 160
           if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
           Get-Content out.txt -ErrorAction SilentlyContinue | Select-String "postava" | Select-Object -First 60
           Get-Content err.txt -ErrorAction SilentlyContinue | Select-Object -Last 30
           Get-Content postava.png.log -ErrorAction SilentlyContinue
-          if (Test-Path postava.png) { "SNIMKA OK $((Get-Item postava.png).Length)"; "PNGB64:" + [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\postava.png")) } else { "SNIMKA CHYBA" }
+          if (Test-Path postava.png) { "SNIMKA OK $((Get-Item postava.png).Length)"; $b = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$PWD\postava.png")); for ($i = 0; $i -lt $b.Length; $i += 3000) { "B64|" + $b.Substring($i, [Math]::Min(3000, $b.Length - $i)) } } else { "SNIMKA CHYBA" }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
