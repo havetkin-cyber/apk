@@ -18,10 +18,31 @@ const POSTAVY = [
 ];
 const ZIP_URL = (z) => `https://opengameart.org/sites/default/files/${z}`;
 
+// mozog: Qwen3 4B (beží na grafike – VRAM; keď nejde, na procesore)
 const MODEL = {
-  uri: 'hf:bartowski/Qwen2.5-3B-Instruct-GGUF/Qwen2.5-3B-Instruct-Q4_K_M.gguf',
-  subor: 'Qwen2.5-3B-Instruct-Q4_K_M.gguf',
-  mb: 1930,
+  uri: 'hf:unsloth/Qwen3-4B-Instruct-2507-GGUF/Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
+  subor: 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf',
+  mb: 2500,
+};
+
+// hlas: Piper + Kasandra (český ženský hlas s emóciami, CC BY 4.0, autor Ondřej Šimek) – beží na procesore (RAM)
+const PIPER_ZIP = 'https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip';
+const KASANDRA = [
+  'https://huggingface.co/rhasspy/piper-voices/resolve/refs%2Fpr%2F98/cs/cs_CZ/kasandra/medium/cs_CZ-kasandra_v3.onnx',
+  'https://huggingface.co/rhasspy/piper-voices/resolve/main/cs/cs_CZ/kasandra/medium/cs_CZ-kasandra-medium.onnx',
+];
+// prednes podľa emócie: dĺžka (pomalšie > 1), živosť intonácie, výška (prehrávanie), hlasitosť
+const PREDNES = {
+  neutral: { dlzka: 1.0, sum: 0.667, sumW: 0.8, vyska: 1.0, hlas: 0.9 },
+  relaxed: { dlzka: 1.05, sum: 0.6, sumW: 0.7, vyska: 1.0, hlas: 0.85 },
+  happy: { dlzka: 0.95, sum: 0.75, sumW: 0.9, vyska: 1.04, hlas: 0.95 },
+  excited: { dlzka: 0.88, sum: 0.8, sumW: 1.0, vyska: 1.07, hlas: 1.0 },
+  angry: { dlzka: 0.93, sum: 0.8, sumW: 0.9, vyska: 0.98, hlas: 1.0 },
+  shout: { dlzka: 0.92, sum: 0.85, sumW: 1.0, vyska: 1.03, hlas: 1.0 },
+  sad: { dlzka: 1.15, sum: 0.55, sumW: 0.6, vyska: 0.96, hlas: 0.75 },
+  scared: { dlzka: 0.9, sum: 0.85, sumW: 1.0, vyska: 1.06, hlas: 0.85 },
+  surprised: { dlzka: 0.95, sum: 0.8, sumW: 1.0, vyska: 1.05, hlas: 0.95 },
+  whisper: { dlzka: 1.08, sum: 0.5, sumW: 0.5, vyska: 1.0, hlas: 0.5 },
 };
 
 let win = null;
@@ -316,8 +337,10 @@ async function nacitajMozog(priebeh) {
       const d = await createModelDownloader({ modelUri: MODEL.uri, dirPath: dir(), onProgress: ({ totalSize, downloadedSize }) => priebeh?.(totalSize ? downloadedSize / totalSize : 0) });
       cesta = await d.download();
     }
-    const llama = await getLlama();
-    const model = await llama.loadModel({ modelPath: cesta });
+    // na grafike (VRAM), keď nejde – na procesore
+    let llama, model;
+    try { llama = await getLlama(); model = await llama.loadModel({ modelPath: cesta, gpuLayers: 'auto' }); }
+    catch (e) { console.error('postava: GPU nejde, idem na CPU', e); llama = await getLlama({ gpu: false }); model = await llama.loadModel({ modelPath: cesta }); }
     const ctx = await model.createContext({ contextSize: 4096 });
     const session = new LlamaChatSession({ contextSequence: ctx.getSequence(), systemPrompt: SYSTEM });
     mozog = { session, model, ctx };
@@ -343,6 +366,55 @@ async function chat(text, tichy = false) {
   if (!EMOCIE.includes(emocia)) emocia = 'neutral';
   if (emocia === 'angry' || emocia === 'shout') zmenNaladu(-3); else if (emocia === 'happy' || emocia === 'excited') zmenNaladu(+3);
   return { text: odp.replace(/\[(\w+)\]/g, '').trim().slice(0, 300), emocia };
+}
+
+// ---------------- hlas (Piper + Kasandra) ----------------
+const piperExe = () => path.join(dir(), 'piper', 'piper.exe');
+const hlasSubor = () => path.join(dir(), 'kasandra.onnx');
+const mamHlas = () => fs.existsSync(piperExe()) && fs.existsSync(hlasSubor()) && fs.existsSync(hlasSubor() + '.json');
+let hlasSa = null, hlasCislo = 0;
+
+async function pripravHlas(priebeh) {
+  if (mamHlas()) return;
+  if (hlasSa) return hlasSa;
+  hlasSa = (async () => {
+    if (!fs.existsSync(piperExe())) {
+      const zip = path.join(dir(), 'piper.zip');
+      await stiahni(PIPER_ZIP, zip, (p) => priebeh?.(p * 0.3));
+      const AdmZip = require('adm-zip');
+      new AdmZip(zip).extractAllTo(dir(), true);   // → dir/piper/piper.exe
+      fs.unlinkSync(zip);
+    }
+    let posledna = null;
+    for (const u of KASANDRA) {
+      try {
+        await stiahni(u, hlasSubor(), (p) => priebeh?.(0.3 + p * 0.68));
+        await stiahni(u + '.json', hlasSubor() + '.json');
+        posledna = null; break;
+      } catch (e) { posledna = e; }
+    }
+    if (posledna) throw posledna;
+    priebeh?.(1);
+  })();
+  try { await hlasSa; } finally { hlasSa = null; }
+}
+
+/** vyrobí WAV pre text s prednesom podľa emócie; vráti { url, vyska, hlas } */
+async function hovor(text, emocia) {
+  if (cfg.postavaHlas === false) return null;
+  await pripravHlas((p) => posli('postava-priebeh', { co: 'hlas', p }));
+  const pr = PREDNES[emocia] || PREDNES.neutral;
+  const out = path.join(dir(), `hlas${hlasCislo++ % 4}.wav`);
+  const { spawn } = require('child_process');
+  await new Promise((ok, chyba) => {
+    const p = spawn(piperExe(), ['--model', hlasSubor(), '--output_file', out, '--length_scale', String(pr.dlzka),
+      '--noise_scale', String(pr.sum), '--noise_w', String(pr.sumW), '--sentence_silence', '0.15'],
+      { cwd: path.dirname(piperExe()), windowsHide: true });
+    p.on('error', chyba);
+    p.on('close', (k) => (k === 0 ? ok() : chyba(new Error('piper ' + k))));
+    p.stdin.end(text.replace(/[*_~#]/g, ''), 'utf8');
+  });
+  return { url: pathToFileURL(out).href + '?' + Date.now(), vyska: pr.vyska, hlas: pr.hlas };
 }
 
 // ---------------- postavy (VRM) ----------------
@@ -389,6 +461,7 @@ function registruj() {
     postavy: POSTAVY.map((p) => ({ id: p.id, nazov: p.nazov, mam: fs.existsSync(cestaPostavy(p.id)) })),
     vybrana: cfg.postavaId || 'shino', vlastna: !!cfg.postavaVlastna, mozog: !!mozog, mozogMb: MODEL.mb,
     mozogStiahnuty: fs.existsSync(path.join(dir(), MODEL.subor)), stav, nalada, urazena,
+    hlas: cfg.postavaHlas !== false, mamHlas: mamHlas(),
   }));
   ipcMain.handle('postava-model', async (e, id) => {
     const c = await pripravPostavu(id || cfg.postavaId || 'shino', (p) => posli('postava-priebeh', { co: 'postava', p }));
@@ -418,6 +491,8 @@ function registruj() {
     return true;
   });
   ipcMain.on('postava-skry', () => vypni());
+  ipcMain.handle('postava-hovor', async (e, text, emocia) => { try { return await hovor(String(text).slice(0, 400), emocia); } catch (err) { console.error('postava hlas', err); return null; } });
+  ipcMain.handle('postava-hlas-prepni', () => { cfg.postavaHlas = cfg.postavaHlas === false; ulozCfg(); return cfg.postavaHlas !== false; });
   ipcMain.handle('postava-kurzor', () => {
     const c = screen.getCursorScreenPoint();
     const b = win ? win.getBounds() : { x: 0, y: 0 };

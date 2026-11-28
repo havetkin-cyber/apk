@@ -81,24 +81,44 @@ function povedz(text, em) {
   bublina.textContent = text;
   bublina.classList.add('vidno');
   nastavEmociu(em || 'neutral', 4000 + text.length * 60);
-  hovori = performance.now() + Math.min(6000, 300 + text.length * 55);
   clearTimeout(skryBublinu);
   skryBublinu = setTimeout(() => bublina.classList.remove('vidno'), 3500 + text.length * 70);
-  hlas(text);
+  if (text === '…') return;
+  hovori = performance.now() + Math.min(6000, 300 + text.length * 55);  // kým nepríde hlas, aspoň hýbe ústami
+  hlas(text, em);
 }
-function hlas(text) {
+
+// hlas Kasandra (Piper) – ústa sa hýbu podľa hlasitosti zvuku
+let audio = null, actx = null, analyzer = null, hlasitost = 0, poradie = 0;
+async function hlas(text, em) {
+  const moje = ++poradie;
+  const r = await P.hovor(text, em || 'neutral').catch(() => null);
+  if (!r || moje !== poradie) return;
   try {
-    const hlasy = speechSynthesis.getVoices();
-    const sk = hlasy.find((v) => v.lang?.toLowerCase().startsWith('sk')) || hlasy.find((v) => v.lang?.toLowerCase().startsWith('cs'));
-    if (!sk) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.voice = sk; u.lang = sk.lang; u.pitch = 1.35; u.rate = 1.05;
-    speechSynthesis.speak(u);
-  } catch {}
+    if (audio) { audio.pause(); }
+    audio = new Audio(r.url);
+    audio.preservesPitch = false; audio.playbackRate = r.vyska; audio.volume = r.hlas;
+    if (!actx) actx = new AudioContext();
+    const src = actx.createMediaElementSource(audio);
+    analyzer = actx.createAnalyser(); analyzer.fftSize = 512;
+    src.connect(analyzer); analyzer.connect(actx.destination);
+    hovori = 0;
+    audio.onended = () => { analyzer = null; hlasitost = 0; };
+    await audio.play();
+  } catch (e) { console.error(e); }
 }
+const buf = new Uint8Array(512);
+function hlasitostZvuku() {
+  if (!analyzer) return 0;
+  analyzer.getByteTimeDomainData(buf);
+  let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; }
+  return Math.min(1, Math.sqrt(s / buf.length) * 6);
+}
+
+// emócie z modelu → výraz tváre (VRM má happy / angry / sad / surprised / relaxed)
+const TVAR = { happy: 'happy', excited: 'happy', angry: 'angry', shout: 'angry', sad: 'sad', scared: 'surprised', surprised: 'surprised', whisper: 'relaxed', relaxed: 'relaxed', neutral: 'neutral' };
 function nastavEmociu(e, ms) {
-  emocia = ['happy', 'angry', 'sad', 'surprised', 'relaxed', 'neutral'].includes(e) ? e : 'neutral';
+  emocia = TVAR[e] || 'neutral';
   emociaDo = performance.now() + ms;
 }
 
@@ -109,7 +129,7 @@ P.on('postava-akcia', (a) => { akcia = a; akciaOd = performance.now(); });
 P.on('postava-priebeh', (d) => {
   const el = document.getElementById('priebeh');
   el.style.display = d.p >= 1 ? 'none' : 'block';
-  el.textContent = (d.co === 'mozog' ? 'Sťahujem mozog' : 'Sťahujem postavu') + ` ${Math.round(d.p * 100)} %`;
+  el.textContent = ({ mozog: 'Sťahujem mozog', hlas: 'Sťahujem hlas Kasandra' }[d.co] || 'Sťahujem postavu') + ` ${Math.round(d.p * 100)} %`;
 });
 
 // ---------------- myš: priechodnosť, ťahanie, pohladkanie, menu ----------------
@@ -177,6 +197,8 @@ async function otvorMenu(x, y) {
     povedz('Chvíľu strpenie, zapínam si mozog…', 'neutral');
     try { await P.mozog(); povedz('Tak, už rozmýšľam. Čo chceš?', 'happy'); } catch (e) { povedz('Mozog sa nepodarilo zapnúť: ' + e.message, 'sad'); }
   });
+  nad('Hlas (Kasandra)');
+  tl(i.hlas ? '🔊 Hlas zapnutý' : '🔇 Hlas vypnutý', async () => { const z = await P.hlasPrepni(); povedz(z ? 'Tak, zase hovorím.' : 'Dobre, budem ticho… hmpf.', z ? 'happy' : 'sad'); });
   nad('');
   tl('🙈 Schovať postavičku', () => P.skry());
   menu.classList.add('vidno');
@@ -249,7 +271,9 @@ function mimika(t, dt) {
   if (stav === 'tahana' || stav === 'pada') e = nalada < -20 ? 'angry' : 'surprised';
   if (e !== 'neutral') em.setValue(e, e === 'relaxed' ? 0.5 : 0.85);
   // ústa pri reči
-  if (performance.now() < hovori) em.setValue('aa', (Math.sin(t * 18) * 0.5 + 0.5) * 0.7);
+  hlasitost += (hlasitostZvuku() - hlasitost) * 0.5;
+  if (analyzer) em.setValue('aa', Math.min(1, hlasitost * 1.3));
+  else if (performance.now() < hovori) em.setValue('aa', (Math.sin(t * 18) * 0.5 + 0.5) * 0.7);
   // žmurkanie
   dalsieZmrk -= dt;
   if (dalsieZmrk <= 0) { zmrk = 0.15; dalsieZmrk = 2 + Math.random() * 4; }
@@ -283,4 +307,3 @@ slucka();
 
 // štart
 P.info().then((i) => startModel(i.vybrana === 'vlastna' ? 'vlastna' : i.vybrana));
-speechSynthesis.getVoices();
