@@ -143,7 +143,6 @@ function vytvor() {
         import('three').then(() => 'three ok', (e) => 'three: ' + e.message),
         import('@pixiv/three-vrm').then(() => 'vrm ok', (e) => 'vrm: ' + e.message),
         import('three/addons/loaders/GLTFLoader.js').then(() => 'gltf ok', (e) => 'gltf: ' + e.message),
-        import('./render.js?x=1').then(() => 'render ok', (e) => 'render: ' + e.message),
       ]).then((r) => r.join(' | '))`).then((r) => zapis('[importy] ' + r)).catch((e) => zapis('[importy chyba] ' + e)), 20000);
     setTimeout(() => win.webContents.executeJavaScript('JSON.stringify({bezi: !!window.__postavaBezi, chyba: document.getElementById("chyba")?.textContent, priebeh: document.getElementById("priebeh")?.textContent, bublina: document.getElementById("bublina")?.textContent})').then((r) => zapis('[stav] ' + r)).catch((e) => zapis('[stav chyba] ' + e)), 135000);
     setTimeout(async () => {
